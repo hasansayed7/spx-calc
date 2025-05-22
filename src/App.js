@@ -159,37 +159,26 @@ function App() {
       style={{
         minHeight: "100vh",
         padding: "40px",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        backgroundColor: "#40E0D0", // Feroza color
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-start",
-        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        fontFamily: "Segoe UI, sans-serif",
       }}
     >
       <div
         style={{
-          maxWidth: 900,
+          maxWidth: 700,
           width: "100%",
           padding: 30,
-          borderRadius: 16,
-          backgroundColor: "rgba(255, 255, 255, 0.95)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-          backdropFilter: "blur(5px)",
+          borderRadius: 12,
+          backgroundColor: "#ffffffee",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
         }}
       >
-        <h1 style={{ 
-          fontSize: 32, 
-          marginBottom: 25, 
-          textAlign: "center",
-          color: "#2d3748",
-          fontWeight: 700,
-          background: "linear-gradient(90deg, #4f46e5, #06b6d4)",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          textShadow: "1px 1px 2px rgba(0,0,0,0.1)"
-        }}>
-          ExcelyTech Product Calculator
-        </h1>
+        <h2 style={{ fontSize: 24, marginBottom: 20, textAlign: "center" }}>
+          SPX & Eset Pricing Shopping Cart
+        </h2>
 
         {/* Add new product section */}
         <div
@@ -207,8 +196,7 @@ function App() {
               padding: "10px",
               fontSize: 16,
               borderRadius: 6,
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#f8fafc",
+              border: "1px solid #ccc",
             }}
           >
             {productOptions.map((p) => (
@@ -228,8 +216,7 @@ function App() {
               padding: "10px",
               fontSize: 16,
               borderRadius: 6,
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#f8fafc",
+              border: "1px solid #ccc",
             }}
           />
           <input
@@ -242,8 +229,7 @@ function App() {
               padding: "10px",
               fontSize: 16,
               borderRadius: 6,
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#f8fafc",
+              border: "1px solid #ccc",
             }}
           />
           <input
@@ -256,26 +242,19 @@ function App() {
               padding: "10px",
               fontSize: 16,
               borderRadius: 6,
-              border: "1px solid #e2e8f0",
-              backgroundColor: "#f8fafc",
+              border: "1px solid #ccc",
             }}
           />
           <button
             onClick={addToCart}
             style={{
-              backgroundColor: "#4f46e5",
+              backgroundColor: "#059669",
               color: "white",
               border: "none",
               borderRadius: 6,
               fontWeight: "bold",
               cursor: "pointer",
               padding: "10px",
-              fontSize: 16,
-              transition: "all 0.2s",
-              ":hover": {
-                backgroundColor: "#4338ca",
-                transform: "translateY(-1px)",
-              },
             }}
           >
             Add
@@ -284,165 +263,116 @@ function App() {
 
         {/* Cart lines */}
         {cart.length === 0 ? (
-          <div style={{ 
-            textAlign: "center", 
-            padding: "40px 20px",
-            borderRadius: 8,
-            backgroundColor: "#f1f5f9",
-            color: "#64748b",
-            fontSize: 18,
-            marginBottom: 20
-          }}>
-            No items in cart
-          </div>
+          <p style={{ textAlign: "center", color: "#555" }}>No items in cart</p>
         ) : (
-          <div style={{ 
-            overflowX: "auto",
-            marginBottom: 20,
-            borderRadius: 8,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
-          }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-              }}
-            >
-              <thead>
-                <tr style={{ 
-                  backgroundColor: "#f1f5f9",
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Product</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Quantity Tier</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Qty</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Markup %</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Tax %</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Resale Price (CAD)</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Profit (CAD)</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cart.map((line) => {
-                  const calc = calculateLine(line);
-                  return (
-                    <tr 
-                      key={line.id} 
-                      style={{ 
-                        borderBottom: "1px solid #e2e8f0",
-                        ":hover": {
-                          backgroundColor: "#f8fafc"
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              marginBottom: 20,
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: "#e5e7eb" }}>
+                <th style={{ padding: "8px" }}>Product</th>
+                <th style={{ padding: "8px" }}>Quantity Tier</th>
+                <th style={{ padding: "8px" }}>Qty</th>
+                <th style={{ padding: "8px" }}>Markup %</th>
+                <th style={{ padding: "8px" }}>Tax %</th>
+                <th style={{ padding: "8px" }}>Resale Price (CAD)</th>
+                <th style={{ padding: "8px" }}>Profit (CAD)</th>
+                <th style={{ padding: "8px" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cart.map((line) => {
+                const calc = calculateLine(line);
+                return (
+                  <tr key={line.id} style={{ borderBottom: "1px solid #ddd" }}>
+                    <td style={{ padding: "8px" }}>
+                      {line.category} - {line.type}
+                    </td>
+                    <td style={{ padding: "8px" }}>{calc.tier}</td>
+                    <td style={{ padding: "8px" }}>
+                      <input
+                        type="number"
+                        min="1"
+                        value={line.quantity}
+                        onChange={(e) =>
+                          updateCartLine(line.id, "quantity", e.target.value)
                         }
-                      }}
-                    >
-                      <td style={{ padding: "12px" }}>
-                        {line.category} - {line.type}
-                      </td>
-                      <td style={{ padding: "12px" }}>{calc.tier}</td>
-                      <td style={{ padding: "12px" }}>
-                        <input
-                          type="number"
-                          min="1"
-                          value={line.quantity}
-                          onChange={(e) =>
-                            updateCartLine(line.id, "quantity", e.target.value)
-                          }
-                          style={{ 
-                            width: "60px", 
-                            padding: "6px",
-                            borderRadius: 4,
-                            border: "1px solid #e2e8f0"
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <input
-                          type="number"
-                          min="0"
-                          value={line.markup}
-                          onChange={(e) =>
-                            updateCartLine(line.id, "markup", e.target.value)
-                          }
-                          style={{ 
-                            width: "60px", 
-                            padding: "6px",
-                            borderRadius: 4,
-                            border: "1px solid #e2e8f0"
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <input
-                          type="number"
-                          min="0"
-                          value={line.taxRate}
-                          onChange={(e) =>
-                            updateCartLine(line.id, "taxRate", e.target.value)
-                          }
-                          style={{ 
-                            width: "60px", 
-                            padding: "6px",
-                            borderRadius: 4,
-                            border: "1px solid #e2e8f0"
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        ${calc.totalResalePriceCAD.toFixed(2)}
-                      </td>
-                      <td style={{ padding: "12px", color: calc.profitColor, fontWeight: 500 }}>
-                        ${calc.totalProfitCAD.toFixed(2)}
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <button
-                          onClick={() => removeFromCart(line.id)}
-                          style={{
-                            backgroundColor: "#ef4444",
-                            color: "white",
-                            border: "none",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            padding: "6px 12px",
-                            transition: "all 0.2s",
-                            ":hover": {
-                              backgroundColor: "#dc2626"
-                            }
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        style={{ width: "60px", padding: "4px" }}
+                      />
+                    </td>
+                    <td style={{ padding: "8px" }}>
+                      <input
+                        type="number"
+                        min="0"
+                        value={line.markup}
+                        onChange={(e) =>
+                          updateCartLine(line.id, "markup", e.target.value)
+                        }
+                        style={{ width: "60px", padding: "4px" }}
+                      />
+                    </td>
+                    <td style={{ padding: "8px" }}>
+                      <input
+                        type="number"
+                        min="0"
+                        value={line.taxRate}
+                        onChange={(e) =>
+                          updateCartLine(line.id, "taxRate", e.target.value)
+                        }
+                        style={{ width: "60px", padding: "4px" }}
+                      />
+                    </td>
+                    <td style={{ padding: "8px" }}>
+                      ${calc.totalResalePriceCAD.toFixed(2)}
+                    </td>
+                    <td style={{ padding: "8px", color: calc.profitColor }}>
+                      ${calc.totalProfitCAD.toFixed(2)}
+                    </td>
+                    <td style={{ padding: "8px" }}>
+                      <button
+                        onClick={() => removeFromCart(line.id)}
+                        style={{
+                          backgroundColor: "#dc2626",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          padding: "4px 8px",
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
 
         {/* Totals summary */}
         <div
           style={{
-            backgroundColor: "#f1f5f9",
+            backgroundColor: "#f9fafb",
             borderRadius: 12,
             padding: 20,
             fontWeight: "bold",
             fontSize: 18,
             display: "flex",
             justifyContent: "space-between",
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
           }}
         >
-          <div style={{ color: "#334155" }}>
-            Total Resale Price: <span style={{ color: "#1e40af" }}>${totals.totalResaleCAD.toFixed(2)} CAD</span> /{" "}
-            <span style={{ color: "#1e40af" }}>₹{(totals.totalResaleINR).toFixed(2)} INR</span>
+          <div>
+            Total Resale Price: ${totals.totalResaleCAD.toFixed(2)} CAD / ₹
+            {(totals.totalResaleINR).toFixed(2)} INR
           </div>
           <div style={{ color: "#059669" }}>
-            Total Profit: <span style={{ fontWeight: 700 }}>${totals.totalProfitCAD.toFixed(2)} CAD</span> /{" "}
-            <span style={{ fontWeight: 700 }}>₹{(totals.totalProfitINR).toFixed(2)} INR</span>
+            Total Profit: ${totals.totalProfitCAD.toFixed(2)} CAD / ₹
+            {(totals.totalProfitINR).toFixed(2)} INR
           </div>
         </div>
       </div>
