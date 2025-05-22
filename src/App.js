@@ -76,14 +76,8 @@ function App() {
     return {
       key,
       quantity,
-      tier,
-      base,
       resale,
-      profit,
-      subtotalCAD,
-      subtotalINR: subtotalCAD * exchangeRate,
-      profitTotalCAD,
-      profitTotalINR: profitTotalCAD * exchangeRate
+      profitTotalCAD
     };
   }).filter(Boolean);
 
@@ -107,7 +101,9 @@ function App() {
           fontFamily: "Segoe UI, sans-serif"
         }}
       >
-        <h2 style={{ fontSize: 28, marginBottom: 30, textAlign: "center", color: "#2c3e50" }}>SPX Product Cart</h2>
+        <h2 style={{ fontSize: 28, marginBottom: 30, textAlign: "center", color: "#2c3e50" }}>
+          ExcelyTech Margin Calculator
+        </h2>
 
         {/* Product Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 30 }}>
@@ -116,6 +112,7 @@ function App() {
             const tier = getQuantityTier(Math.max(1, quantity));
             const pricePerUnit = pricingData[tier][key];
             const resale = pricePerUnit * (1 + safeMarkup / 100);
+            const profit = resale - pricePerUnit;
 
             return (
               <div
@@ -131,7 +128,8 @@ function App() {
                 <div style={{ fontSize: 18, fontWeight: "bold", marginBottom: 6 }}>{label}</div>
                 <div style={{ fontSize: 14, color: "#666", marginBottom: 8 }}>{feature}</div>
                 <div style={{ fontSize: 14, marginBottom: 10 }}>
-                  Price: ${pricePerUnit.toFixed(2)} CAD → ₹{(resale * exchangeRate).toFixed(0)} INR
+                  Price: ${pricePerUnit.toFixed(2)} CAD → Resale: ${resale.toFixed(2)} CAD<br />
+                  <span style={{ fontSize: 13, color: "#888" }}>Per unit profit: ${profit.toFixed(2)} CAD</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
@@ -218,9 +216,9 @@ function App() {
           {summary.length === 0 && <p style={{ color: "#888" }}>No products selected.</p>}
           {summary.map((item) => (
             <div key={item.key} style={{ marginBottom: 15 }}>
-              <strong>{item.key}</strong>: {item.quantity} x ${item.resale.toFixed(2)} CAD → ₹{item.subtotalINR.toFixed(0)} INR
+              <strong>{item.key}</strong>: {item.quantity} x ${item.resale.toFixed(2)} CAD
               <div style={{ fontSize: 13, color: "#666" }}>
-                Profit: ₹{item.profitTotalINR.toFixed(0)} INR
+                Profit: ${item.profitTotalCAD.toFixed(2)} CAD
               </div>
             </div>
           ))}
@@ -228,8 +226,8 @@ function App() {
             <>
               <hr style={{ margin: "20px 0" }} />
               <div style={{ fontSize: 18, fontWeight: "bold", color: "#27ae60" }}>
-                Total Resale: ₹{totalINR.toFixed(0)} INR<br />
-                Total Profit: ₹{totalProfitINR.toFixed(0)} INR
+                Total Resale: ${totalCAD.toFixed(2)} CAD / ₹{totalINR.toFixed(0)} INR<br />
+                Total Profit: ${totalProfitCAD.toFixed(2)} CAD / ₹{totalProfitINR.toFixed(0)} INR
               </div>
             </>
           )}
