@@ -9,26 +9,10 @@ const pricingData = {
 };
 
 const licenseOptions = [
-  {
-    key: "Desktop",
-    label: "🖥 Desktop",
-    feature: "Great for individual workstations"
-  },
-  {
-    key: "VMs",
-    label: "☁️ VMs",
-    feature: "Scalable for virtual environments"
-  },
-  {
-    key: "SBS",
-    label: "🧑‍💼 SBS",
-    feature: "Ideal for small business servers"
-  },
-  {
-    key: "Physical Server",
-    label: "🖨 Physical Server",
-    feature: "Powerful support for enterprise needs"
-  }
+  { key: "Desktop", label: "🖥 Desktop", feature: "Great for individual workstations" },
+  { key: "VMs", label: "☁️ VMs", feature: "Scalable for virtual environments" },
+  { key: "SBS", label: "🧑‍💼 SBS", feature: "Ideal for small business servers" },
+  { key: "Physical Server", label: "🖨 Physical Server", feature: "Powerful support for enterprise needs" }
 ];
 
 const getQuantityTier = (quantity) => {
@@ -47,6 +31,10 @@ function App() {
     SBS: 0,
     "Physical Server": 0
   });
+  const [serviceCharge, setServiceCharge] = useState("");
+  const [taxPercent, setTaxPercent] = useState(0);
+  const [stripeFee, setStripeFee] = useState(0);
+  const [waiveStripe, setWaiveStripe] = useState(false);
 
   const exchangeRate = 61.87;
   const safeMarkup = markup < 15 ? 15 : markup;
@@ -88,25 +76,36 @@ function App() {
     }));
   };
 
+  const taxAmount = (totalCAD * taxPercent) / 100;
+  const finalTotal = totalCAD + taxAmount + (waiveStripe ? 0 : parseFloat(stripeFee || 0));
+  const finalINR = finalTotal * exchangeRate;
+
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: 40, backgroundColor: "#f4f7fb", minHeight: "100vh" }}>
+    <div style={{ display: "flex", justifyContent: "center", padding: 20, backgroundColor: "#f4f7fb", minHeight: "100vh" }}>
       <div
         style={{
-          maxWidth: 800,
+          maxWidth: 900,
           width: "100%",
-          padding: 30,
+          padding: 20,
           borderRadius: 12,
           boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
           backgroundColor: "#fff",
           fontFamily: "Segoe UI, sans-serif"
         }}
       >
-        <h2 style={{ fontSize: 28, marginBottom: 30, textAlign: "center", color: "#2c3e50" }}>
+        <h2 style={{ fontSize: 26, marginBottom: 20, textAlign: "center", color: "#2c3e50" }}>
           ExcelyTech Margin Calculator
         </h2>
 
-        {/* Product Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 30 }}>
+        {/* Product Grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+            gap: 20,
+            marginBottom: 30
+          }}
+        >
           {licenseOptions.map(({ key, label, feature }) => {
             const quantity = quantities[key];
             const tier = getQuantityTier(Math.max(1, quantity));
@@ -128,8 +127,8 @@ function App() {
                 <div style={{ fontSize: 18, fontWeight: "bold", marginBottom: 6 }}>{label}</div>
                 <div style={{ fontSize: 14, color: "#666", marginBottom: 8 }}>{feature}</div>
                 <div style={{ fontSize: 14, marginBottom: 10 }}>
-                  Price: ${pricePerUnit.toFixed(2)} CAD → Resale: ${resale.toFixed(2)} CAD<br />
-                  <span style={{ fontSize: 13, color: "#888" }}>Per unit profit: ${profit.toFixed(2)} CAD</span>
+                  Price: ${pricePerUnit.toFixed(2)} → Resale: ${resale.toFixed(2)}<br />
+                  <span style={{ fontSize: 13, color: "#888" }}>Profit: ${profit.toFixed(2)} / unit</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
@@ -184,8 +183,10 @@ function App() {
         </div>
 
         {/* Markup */}
-        <div style={{ marginBottom: 30 }}>
-          <label style={{ display: "block", fontWeight: 600, color: "#34495e", marginBottom: 8 }}>Markup % (min 15%)</label>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontWeight: 600, color: "#34495e", marginBottom: 8 }}>
+            Markup % (min 15%)
+          </label>
           <input
             type="number"
             min={15}
@@ -200,6 +201,79 @@ function App() {
               backgroundColor: "#f9fafb"
             }}
           />
+        </div>
+
+        {/* Service Charge */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontWeight: 600, color: "#34495e", marginBottom: 8 }}>
+            Service Charge (setup, support, etc.)
+          </label>
+          <input
+            type="text"
+            value={serviceCharge}
+            onChange={(e) => setServiceCharge(e.target.value)}
+            placeholder="e.g. $200 one-time setup fee"
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: 16,
+              borderRadius: 8,
+              border: "1px solid #ccc",
+              backgroundColor: "#f9fafb"
+            }}
+          />
+        </div>
+
+        {/* Tax and Stripe Fee */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+          <div>
+            <label style={{ fontWeight: 600, color: "#34495e", marginBottom: 8, display: "block" }}>
+              Tax % (applied to total)
+            </label>
+            <input
+              type="number"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(Number(e.target.value))}
+              placeholder="e.g. 5"
+              style={{
+                width: "100%",
+                padding: "12px",
+                fontSize: 16,
+                borderRadius: 8,
+                border: "1px solid #ccc",
+                backgroundColor: "#f9fafb"
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontWeight: 600, color: "#34495e", marginBottom: 8, display: "block" }}>
+              Stripe Fee (CAD)
+            </label>
+            <input
+              type="number"
+              value={stripeFee}
+              onChange={(e) => setStripeFee(Number(e.target.value))}
+              disabled={waiveStripe}
+              placeholder="e.g. 12.99"
+              style={{
+                width: "100%",
+                padding: "12px",
+                fontSize: 16,
+                borderRadius: 8,
+                border: "1px solid #ccc",
+                backgroundColor: waiveStripe ? "#eee" : "#f9fafb"
+              }}
+            />
+            <label style={{ display: "block", marginTop: 10 }}>
+              <input
+                type="checkbox"
+                checked={waiveStripe}
+                onChange={(e) => setWaiveStripe(e.target.checked)}
+              />{" "}
+              Waive Stripe Fee
+            </label>
+          </div>
         </div>
 
         {/* Summary */}
@@ -225,8 +299,21 @@ function App() {
           {summary.length > 0 && (
             <>
               <hr style={{ margin: "20px 0" }} />
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#27ae60" }}>
-                Total Resale: ${totalCAD.toFixed(2)} CAD / ₹{totalINR.toFixed(0)} INR<br />
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
+                Service Charge: <span style={{ color: "#2c3e50" }}>{serviceCharge || "None"}</span>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
+                Tax: ${taxAmount.toFixed(2)} CAD
+              </div>
+              {!waiveStripe && (
+                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
+                  Stripe Fee: ${parseFloat(stripeFee || 0).toFixed(2)} CAD
+                </div>
+              )}
+              <div style={{ fontSize: 18, fontWeight: "bold", color: "#27ae60", marginTop: 10 }}>
+                Final Total: ${finalTotal.toFixed(2)} CAD / ₹{finalINR.toFixed(0)} INR
+              </div>
+              <div style={{ fontSize: 14, color: "#888", marginTop: 5 }}>
                 Total Profit: ${totalProfitCAD.toFixed(2)} CAD / ₹{totalProfitINR.toFixed(0)} INR
               </div>
             </>
