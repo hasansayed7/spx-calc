@@ -12,7 +12,7 @@ const licenseOptions = [
   { key: "Desktop", label: "🖥 Desktop", feature: "Great for individual workstations" },
   { key: "VMs", label: "☁️ VMs", feature: "Scalable for virtual environments" },
   { key: "SBS", label: "🧑‍💼 SBS", feature: "Ideal for small business servers" },
-  { key: "Physical Server", label: "🖨 Physical Server", feature: "Powerful support for enterprise needs" }
+  { key: "Physical Server", label: "🖨 Physical Server", feature: "Support for enterprise needs" }
 ];
 
 const getQuantityTier = (quantity) => {
@@ -32,41 +32,32 @@ function App() {
     "Physical Server": 0
   });
   const [serviceCharge, setServiceCharge] = useState("");
-  const [taxPercent, setTaxPercent] = useState(0);
-  const [stripeFee, setStripeFee] = useState(0);
-  const [waiveStripe, setWaiveStripe] = useState(false);
+  const [taxPercent, setTaxPercent] = useState(13);
+  const [stripeFeePercent, setStripeFeePercent] = useState(2.9);
+  const [waiveStripeFee, setWaiveStripeFee] = useState(false);
 
   const exchangeRate = 61.87;
-  const safeMarkup = markup < 15 ? 15 : markup;
+  const safeMarkup = Math.max(markup, 15);
+  const safeTax = Math.max(taxPercent, 0);
 
-  let totalCAD = 0;
+  let totalResale = 0;
   let totalINR = 0;
-  let totalProfitCAD = 0;
-  let totalProfitINR = 0;
 
   const summary = licenseOptions.map(({ key }) => {
     const quantity = Math.max(0, quantities[key]);
     if (quantity === 0) return null;
 
     const tier = getQuantityTier(quantity);
-    const base = pricingData[tier][key];
-    const resale = base * (1 + safeMarkup / 100);
-    const profit = resale - base;
+    const baseWithTax = pricingData[tier][key];
+    const basePreTax = baseWithTax / (1 + 0.13); // known 13% tax baked in
+    const resalePreTax = basePreTax * (1 + safeMarkup / 100);
+    const resaleWithTax = resalePreTax * (1 + safeTax / 100);
 
-    const subtotalCAD = resale * quantity;
-    const profitTotalCAD = profit * quantity;
+    const subtotal = resaleWithTax * quantity;
+    totalResale += subtotal;
+    totalINR += subtotal * exchangeRate;
 
-    totalCAD += subtotalCAD;
-    totalINR += subtotalCAD * exchangeRate;
-    totalProfitCAD += profitTotalCAD;
-    totalProfitINR += profitTotalCAD * exchangeRate;
-
-    return {
-      key,
-      quantity,
-      resale,
-      profitTotalCAD
-    };
+    return { key, quantity, resaleWithTax };
   }).filter(Boolean);
 
   const updateQuantity = (key, delta) => {
@@ -76,252 +67,135 @@ function App() {
     }));
   };
 
-  const taxAmount = (totalCAD * taxPercent) / 100;
-  const finalTotal = totalCAD + taxAmount + (waiveStripe ? 0 : parseFloat(stripeFee || 0));
-  const finalINR = finalTotal * exchangeRate;
+  const stripeFee = waiveStripeFee ? 0 : (stripeFeePercent / 100) * totalResale;
+  const finalTotalCAD = totalResale + stripeFee;
+  const finalTotalINR = finalTotalCAD * exchangeRate;
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: 20, backgroundColor: "#f4f7fb", minHeight: "100vh" }}>
-      <div
-        style={{
-          maxWidth: 900,
-          width: "100%",
-          padding: 20,
-          borderRadius: 12,
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
-          backgroundColor: "#fff",
-          fontFamily: "Segoe UI, sans-serif"
-        }}
-      >
-        <h2 style={{ fontSize: 26, marginBottom: 20, textAlign: "center", color: "#2c3e50" }}>
-          ExcelyTech Margin Calculator
-        </h2>
+    <div style={{
+      padding: 20,
+      backgroundColor: "#f4f7fb",
+      minHeight: "100vh",
+      fontFamily: "Segoe UI, sans-serif"
+    }}>
+      <div style={{
+        maxWidth: 800,
+        margin: "0 auto",
+        padding: 20,
+        borderRadius: 12,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+        backgroundColor: "#fff"
+      }}>
+        <h2 style={{ fontSize: 26, textAlign: "center", marginBottom: 20 }}>ExcelyTech Margin Calculator</h2>
 
-        {/* Product Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: 20,
-            marginBottom: 30
-          }}
-        >
+        {/* Products */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 30 }}>
           {licenseOptions.map(({ key, label, feature }) => {
             const quantity = quantities[key];
             const tier = getQuantityTier(Math.max(1, quantity));
-            const pricePerUnit = pricingData[tier][key];
-            const resale = pricePerUnit * (1 + safeMarkup / 100);
-            const profit = resale - pricePerUnit;
+            const baseWithTax = pricingData[tier][key];
+            const basePreTax = baseWithTax / 1.13;
+            const resalePreTax = basePreTax * (1 + safeMarkup / 100);
+            const resaleWithTax = resalePreTax * (1 + safeTax / 100);
 
             return (
-              <div
-                key={key}
-                style={{
-                  borderRadius: 10,
-                  padding: 20,
-                  border: "1px solid #ddd",
-                  backgroundColor: "#fafafa",
-                  boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
-                }}
-              >
-                <div style={{ fontSize: 18, fontWeight: "bold", marginBottom: 6 }}>{label}</div>
-                <div style={{ fontSize: 14, color: "#666", marginBottom: 8 }}>{feature}</div>
-                <div style={{ fontSize: 14, marginBottom: 10 }}>
-                  Price: ${pricePerUnit.toFixed(2)} → Resale: ${resale.toFixed(2)}<br />
-                  <span style={{ fontSize: 13, color: "#888" }}>Profit: ${profit.toFixed(2)} / unit</span>
+              <div key={key} style={{
+                padding: 16,
+                border: "1px solid #ddd",
+                borderRadius: 10,
+                backgroundColor: "#fafafa"
+              }}>
+                <div style={{ fontWeight: "bold", marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>{feature}</div>
+                <div style={{ fontSize: 13, marginBottom: 10 }}>
+                  Final Price: ${resaleWithTax.toFixed(2)} CAD
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button
-                    onClick={() => updateQuantity(key, -1)}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 6,
-                      backgroundColor: "#e74c3c",
-                      color: "#fff",
-                      border: "none",
-                      fontSize: 18,
-                      cursor: "pointer"
-                    }}
-                  >
-                    −
-                  </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => updateQuantity(key, -1)} style={btnStyle("red")}>−</button>
                   <input
                     type="number"
-                    min={0}
-                    value={quantity}
                     readOnly
-                    style={{
-                      width: 50,
-                      textAlign: "center",
-                      fontSize: 16,
-                      border: "1px solid #ccc",
-                      borderRadius: 6,
-                      backgroundColor: "#fff",
-                      padding: "6px 0"
-                    }}
+                    value={quantity}
+                    style={{ width: 40, textAlign: "center", fontSize: 14 }}
                   />
-                  <button
-                    onClick={() => updateQuantity(key, 1)}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 6,
-                      backgroundColor: "#2ecc71",
-                      color: "#fff",
-                      border: "none",
-                      fontSize: 18,
-                      cursor: "pointer"
-                    }}
-                  >
-                    +
-                  </button>
+                  <button onClick={() => updateQuantity(key, 1)} style={btnStyle("green")}>+</button>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Markup */}
+        {/* Inputs */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: "block", fontWeight: 600, color: "#34495e", marginBottom: 8 }}>
-            Markup % (min 15%)
-          </label>
-          <input
-            type="number"
-            min={15}
-            value={markup}
-            onChange={(e) => setMarkup(Math.max(Number(e.target.value), 15))}
-            style={{
-              width: "100%",
-              padding: "12px",
-              fontSize: 16,
-              borderRadius: 8,
-              border: "1px solid #ccc",
-              backgroundColor: "#f9fafb"
-            }}
-          />
+          <label>Markup % (min 15%)</label>
+          <input type="number" value={markup} min={15} onChange={e => setMarkup(+e.target.value)} style={inputStyle} />
         </div>
-
-        {/* Service Charge */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: "block", fontWeight: 600, color: "#34495e", marginBottom: 8 }}>
-            Service Charge (setup, support, etc.)
-          </label>
-          <input
-            type="text"
-            value={serviceCharge}
-            onChange={(e) => setServiceCharge(e.target.value)}
-            placeholder="e.g. $200 one-time setup fee"
-            style={{
-              width: "100%",
-              padding: "12px",
-              fontSize: 16,
-              borderRadius: 8,
-              border: "1px solid #ccc",
-              backgroundColor: "#f9fafb"
-            }}
-          />
+          <label>Service Charge (CAD)</label>
+          <input type="text" value={serviceCharge} onChange={e => setServiceCharge(e.target.value)} style={inputStyle} />
         </div>
-
-        {/* Tax and Stripe Fee */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-          <div>
-            <label style={{ fontWeight: 600, color: "#34495e", marginBottom: 8, display: "block" }}>
-              Tax % (applied to total)
-            </label>
-            <input
-              type="number"
-              value={taxPercent}
-              onChange={(e) => setTaxPercent(Number(e.target.value))}
-              placeholder="e.g. 5"
-              style={{
-                width: "100%",
-                padding: "12px",
-                fontSize: 16,
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                backgroundColor: "#f9fafb"
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontWeight: 600, color: "#34495e", marginBottom: 8, display: "block" }}>
-              Stripe Fee (CAD)
-            </label>
-            <input
-              type="number"
-              value={stripeFee}
-              onChange={(e) => setStripeFee(Number(e.target.value))}
-              disabled={waiveStripe}
-              placeholder="e.g. 12.99"
-              style={{
-                width: "100%",
-                padding: "12px",
-                fontSize: 16,
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                backgroundColor: waiveStripe ? "#eee" : "#f9fafb"
-              }}
-            />
-            <label style={{ display: "block", marginTop: 10 }}>
-              <input
-                type="checkbox"
-                checked={waiveStripe}
-                onChange={(e) => setWaiveStripe(e.target.checked)}
-              />{" "}
-              Waive Stripe Fee
+        <div style={{ marginBottom: 20 }}>
+          <label>Tax %</label>
+          <input type="number" value={taxPercent} onChange={e => setTaxPercent(+e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label>Stripe Fee %</label>
+          <input type="number" value={stripeFeePercent} onChange={e => setStripeFeePercent(+e.target.value)} style={inputStyle} />
+          <div style={{ marginTop: 8 }}>
+            <label>
+              <input type="checkbox" checked={waiveStripeFee} onChange={e => setWaiveStripeFee(e.target.checked)} /> Waive Stripe Fee
             </label>
           </div>
         </div>
 
         {/* Summary */}
-        <div
-          style={{
-            backgroundColor: "#f9fafb",
-            padding: 20,
-            borderRadius: 10,
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 4px 10px rgba(0, 0, 0, 0.05)"
-          }}
-        >
-          <h3 style={{ fontSize: 20, marginBottom: 16, color: "#2c3e50" }}>Summary</h3>
-          {summary.length === 0 && <p style={{ color: "#888" }}>No products selected.</p>}
-          {summary.map((item) => (
-            <div key={item.key} style={{ marginBottom: 15 }}>
-              <strong>{item.key}</strong>: {item.quantity} x ${item.resale.toFixed(2)} CAD
-              <div style={{ fontSize: 13, color: "#666" }}>
-                Profit: ${item.profitTotalCAD.toFixed(2)} CAD
-              </div>
-            </div>
-          ))}
-          {summary.length > 0 && (
+        <div style={{
+          backgroundColor: "#f9fafb",
+          padding: 20,
+          borderRadius: 10,
+          border: "1px solid #e5e7eb"
+        }}>
+          <h3 style={{ fontSize: 18, marginBottom: 12 }}>Summary</h3>
+          {summary.length === 0 ? <p style={{ color: "#888" }}>No products selected.</p> :
             <>
-              <hr style={{ margin: "20px 0" }} />
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                Service Charge: <span style={{ color: "#2c3e50" }}>{serviceCharge || "None"}</span>
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                Tax: ${taxAmount.toFixed(2)} CAD
-              </div>
-              {!waiveStripe && (
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-                  Stripe Fee: ${parseFloat(stripeFee || 0).toFixed(2)} CAD
+              {summary.map(({ key, quantity, resaleWithTax }) => (
+                <div key={key}>
+                  <strong>{key}</strong>: {quantity} x ${resaleWithTax.toFixed(2)} CAD
                 </div>
-              )}
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#27ae60", marginTop: 10 }}>
-                Final Total: ${finalTotal.toFixed(2)} CAD / ₹{finalINR.toFixed(0)} INR
-              </div>
-              <div style={{ fontSize: 14, color: "#888", marginTop: 5 }}>
-                Total Profit: ${totalProfitCAD.toFixed(2)} CAD / ₹{totalProfitINR.toFixed(0)} INR
+              ))}
+              <hr style={{ margin: "15px 0" }} />
+              <div>Service Charge: {serviceCharge || "N/A"}</div>
+              <div>Stripe Fee: ${stripeFee.toFixed(2)} CAD</div>
+              <div style={{ marginTop: 10, fontWeight: "bold", fontSize: 16 }}>
+                Total: ${finalTotalCAD.toFixed(2)} CAD / ₹{finalTotalINR.toFixed(0)} INR
               </div>
             </>
-          )}
+          }
         </div>
       </div>
     </div>
   );
 }
+
+const btnStyle = (color) => ({
+  width: 30,
+  height: 30,
+  fontSize: 16,
+  border: "none",
+  borderRadius: 6,
+  backgroundColor: color === "red" ? "#e74c3c" : "#2ecc71",
+  color: "#fff",
+  cursor: "pointer"
+});
+
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginTop: 6,
+  fontSize: 14,
+  borderRadius: 6,
+  border: "1px solid #ccc",
+  backgroundColor: "#fefefe"
+};
 
 export default App;
