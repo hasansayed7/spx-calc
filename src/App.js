@@ -14,10 +14,42 @@ const TEXT_DARK = "#232323";
 const arcservePrice = 5.38;
 
 const pricingData = {
-  Desktop: { base: [ { min: 1, max: 25, cost: 5.88 }, { min: 26, max: 50, cost: 5.66 }, { min: 51, max: 100, cost: 5.35 }, { min: 101, max: 150, cost: 4.99 }, { min: 151, max: Infinity, cost: 4.66 } ] },
-  VMs: { base: [ { min: 1, max: 25, cost: 30.00 }, { min: 26, max: 50, cost: 30.00 }, { min: 51, max: 100, cost: 30.00 }, { min: 101, max: 150, cost: 30.00 }, { min: 151, max: Infinity, cost: 27.76 } ] },
-  SBS: { base: [ { min: 1, max: 25, cost: 24.05 }, { min: 26, max: 50, cost: 22.79 }, { min: 51, max: 100, cost: 21.13 }, { min: 101, max: 150, cost: 19.26 }, { min: 151, max: Infinity, cost: 17.72 } ] },
-  "Physical Server": { base: [ { min: 1, max: 25, cost: 43.22 }, { min: 26, max: 50, cost: 40.14 }, { min: 51, max: 100, cost: 36.10 }, { min: 101, max: 150, cost: 31.51 }, { min: 151, max: Infinity, cost: 27.76 } ] }
+  Desktop: { 
+    base: [ 
+      { min: 1, max: 25, cost: 5.88 }, 
+      { min: 26, max: 50, cost: 5.66 }, 
+      { min: 51, max: 100, cost: 5.35 }, 
+      { min: 101, max: 150, cost: 4.99 }, 
+      { min: 151, max: Infinity, cost: 4.66 } 
+    ] 
+  },
+  VMs: { 
+    base: [ 
+      { min: 1, max: 25, cost: 30.00 }, 
+      { min: 26, max: 50, cost: 30.00 }, 
+      { min: 51, max: 100, cost: 30.00 }, 
+      { min: 101, max: 150, cost: 30.00 }, 
+      { min: 151, max: Infinity, cost: 27.76 } 
+    ] 
+  },
+  SBS: { 
+    base: [ 
+      { min: 1, max: 25, cost: 24.05 }, 
+      { min: 26, max: 50, cost: 22.79 }, 
+      { min: 51, max: 100, cost: 21.13 }, 
+      { min: 101, max: 150, cost: 19.26 }, 
+      { min: 151, max: Infinity, cost: 17.72 } 
+    ] 
+  },
+  "Physical Server": { 
+    base: [ 
+      { min: 1, max: 25, cost: 43.22 }, 
+      { min: 26, max: 50, cost: 40.14 }, 
+      { min: 51, max: 100, cost: 36.10 }, 
+      { min: 101, max: 150, cost: 31.51 }, 
+      { min: 151, max: Infinity, cost: 27.76 } 
+    ] 
+  }
 };
 
 const getBaseCost = (type, qty) => {
@@ -48,6 +80,7 @@ function App() {
   const [stripeWaived, setStripeWaived] = useState(false);
   const [taxPercent, setTaxPercent] = useState(13);
   const [darkMode, setDarkMode] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   const [arcservePlatform, setArcservePlatform] = useState("Office365");
   const [arcserveCloud, setArcserveCloud] = useState("AWS");
@@ -64,12 +97,6 @@ function App() {
 
   // For capturing the summary HTML
   const summaryRef = useRef(null);
-
-  useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setDarkMode(true);
-    }
-  }, []);
 
   const toggleTheme = () => setDarkMode(!darkMode);
 
@@ -118,7 +145,9 @@ function App() {
         buttonSecondary: "#ff1744",
         inputBg: "#232323",
         border: "1.5px solid #343a3f",
-        shadow: "0 4px 24px rgba(0,0,0,0.18)"
+        shadow: "0 4px 24px rgba(0,0,0,0.18)",
+        tableHeader: "#b2b7bb",
+        tableBorder: "#444"
       }
     : {
         bg: LIGHT_BG,
@@ -130,7 +159,9 @@ function App() {
         buttonSecondary: "#ff1744",
         inputBg: "#f7fafc",
         border: "1.5px solid #e3e8f7",
-        shadow: "0 4px 24px rgba(31, 38, 135, 0.06)"
+        shadow: "0 4px 24px rgba(31, 38, 135, 0.06)",
+        tableHeader: "#666",
+        tableBorder: "#ddd"
       };
 
   const logoSrc = darkMode ? etDark : etWhite;
@@ -141,14 +172,14 @@ function App() {
       const qty = quantities[key];
       if (qty === 0) return null;
       const base = key === "Arcserve" ? arcservePrice : getBaseCost(key, qty);
-      const subtotal = base * qty;
+      const baseWithTax = base * (1 + taxPercent / 100);
+      const subtotal = isAnnual ? (baseWithTax * qty * 12) : (baseWithTax * qty);
       totalBeforeMarkup += subtotal;
       return { 
         key: key === "Arcserve" ? `Arcserve SaaS Backup (${arcservePlatform}, ${arcserveCloud})` : key, 
         quantity: qty, 
-        base, 
-        subtotal, 
-        taxed: base * (1 + taxPercent / 100) 
+        base: isAnnual ? (baseWithTax * 12) : baseWithTax, 
+        subtotal
       };
     }).filter(Boolean)
   ];
@@ -157,9 +188,9 @@ function App() {
   const totalAfterMarkup = totalBeforeMarkup + markupAmount;
   const discountAmount = (totalAfterMarkup * discountPercent) / 100;
   const totalAfterDiscount = totalAfterMarkup - discountAmount;
-  const taxAmount = (totalAfterDiscount * taxPercent) / 100;
-  const stripeFee = stripeWaived ? 0 : (totalAfterDiscount + taxAmount) * 0.029;
-  const totalAfterTax = totalAfterDiscount + taxAmount + stripeFee;
+  const taxAmount = 0; // Now included in the unit price
+  const stripeFee = stripeWaived ? 0 : (totalAfterDiscount) * 0.029;
+  const totalAfterTax = totalAfterDiscount + stripeFee;
 
   // EmailJS send function
   const sendQuotationEmail = () => {
@@ -172,7 +203,8 @@ function App() {
     const templateParams = {
       customer_name: customerName,
       to_email: customerEmail,
-      message: summaryHtml
+      message: summaryHtml,
+      billing_period: isAnnual ? "Annual (12 months)" : "Monthly"
     };
     emailjs
       .send(
@@ -208,6 +240,12 @@ function App() {
     doc.text("ExcelyTech Quotation", pageWidth / 2, y, { align: "center" });
     y += 32;
 
+    // Billing period
+    doc.setFontSize(14);
+    doc.setTextColor("#666");
+    doc.text(`Billing Period: ${isAnnual ? "Annual (12 months)" : "Monthly"}`, 40, y);
+    y += 24;
+
     // Pricing Configuration (excluding markup)
     doc.setFontSize(13);
     doc.setTextColor("#444");
@@ -229,7 +267,7 @@ function App() {
     doc.setTextColor("#666");
     doc.text("Type", 40, y);
     doc.text("Qty", 210, y, { align: "right" });
-    doc.text("Base/Unit", 300, y, { align: "right" });
+    doc.text(`${isAnnual ? "Annual/Unit (with tax)" : "Base/Unit (with tax)"}`, 300, y, { align: "right" });
     doc.text("Subtotal", pageWidth - 40, y, { align: "right" });
     y += 12;
 
@@ -257,7 +295,6 @@ function App() {
     doc.setTextColor("#444");
     doc.text(`Total Before Discount: $${totalAfterMarkup.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
     doc.text(`Discount (${discountPercent}%): -$${discountAmount.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
-    doc.text(`Tax (${taxPercent}%): $${taxAmount.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
     doc.text(`Stripe Fee: $${stripeFee.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
 
     doc.setFontSize(15);
@@ -270,7 +307,101 @@ function App() {
     doc.setTextColor("#888");
     doc.text("If you have any questions or require adjustments, please contact info@excelytech.com", 40, y);
 
-    doc.save("ExcelyTech_Quotation.pdf");
+    doc.save(`ExcelyTech_Quotation_${isAnnual ? "Annual" : "Monthly"}.pdf`);
+  };
+
+  const renderPriceTable = (type) => {
+    if (type === "Arcserve") {
+      return (
+        <div style={{ 
+          marginTop: '0.5rem',
+          fontSize: '0.85rem',
+          color: theme.textSecondary,
+          lineHeight: '1.4',
+          width: '100%'
+        }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '0.8rem'
+          }}>
+            <tbody>
+              <tr>
+                <td style={{ 
+                  padding: '0.25rem 0',
+                  borderBottom: `1px solid ${theme.tableBorder}`,
+                  fontWeight: 600
+                }}>Flat Rate:</td>
+                <td style={{ 
+                  padding: '0.25rem 0',
+                  borderBottom: `1px solid ${theme.tableBorder}`,
+                  textAlign: 'right'
+                }}>
+                  ${arcservePrice.toFixed(2)}/{isAnnual ? (arcservePrice * 12).toFixed(2) : 'mo'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    const slabs = pricingData[type]?.base || [];
+    return (
+      <div style={{ 
+        marginTop: '0.5rem',
+        fontSize: '0.85rem',
+        color: theme.textSecondary,
+        lineHeight: '1.4',
+        width: '100%'
+      }}>
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: '0.8rem'
+        }}>
+          <thead>
+            <tr>
+              <th style={{ 
+                padding: '0.25rem 0',
+                borderBottom: `1px solid ${theme.tableBorder}`,
+                textAlign: 'left',
+                fontWeight: 600
+              }}>Qty Range</th>
+              <th style={{ 
+                padding: '0.25rem 0',
+                borderBottom: `1px solid ${theme.tableBorder}`,
+                textAlign: 'right',
+                fontWeight: 600
+              }}>Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {slabs.map((slab, index) => (
+              <tr key={index}>
+                <td style={{ 
+                  padding: '0.25rem 0',
+                  borderBottom: `1px solid ${theme.tableBorder}`
+                }}>
+                  {slab.min === 1 && slab.max === 25 && "1-25"}
+                  {slab.min === 26 && slab.max === 50 && "26-50"}
+                  {slab.min === 51 && slab.max === 100 && "51-100"}
+                  {slab.min === 101 && slab.max === 150 && "101-150"}
+                  {slab.min === 151 && slab.max === Infinity && "151+"}
+                </td>
+                <td style={{ 
+                  padding: '0.25rem 0',
+                  borderBottom: `1px solid ${theme.tableBorder}`,
+                  textAlign: 'right'
+                }}>
+                  ${slab.cost.toFixed(2)}/{isAnnual ? (slab.cost * 12).toFixed(2) : 'mo'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   return (
@@ -353,7 +484,8 @@ function App() {
           {licenseOptions.map(({ key, label, feature }) => {
             const qty = quantities[key];
             const base = key === "Arcserve" ? arcservePrice : getBaseCost(key, qty);
-            const taxed = base * (1 + taxPercent / 100);
+            const displayBase = isAnnual ? base * 12 : base;
+            const taxed = isAnnual ? (base * (1 + taxPercent / 100) * 12) : (base * (1 + taxPercent / 100));
 
             return (
               <div key={key} className="card">
@@ -363,7 +495,7 @@ function App() {
                   {qty > 0 ? (
                     <>
                       <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
-                        <span style={{ opacity: 0.8 }}>Base:</span> <strong>${base.toFixed(2)} CAD</strong>
+                        <span style={{ opacity: 0.8 }}>Base:</span> <strong>${displayBase.toFixed(2)} CAD</strong>
                       </div>
                       <div style={{ fontSize: '1rem', color: theme.textPrimary, marginLeft: 16 }}>
                         <span style={{ opacity: 0.8 }}>With Tax:</span> <strong>${taxed.toFixed(2)} CAD</strong>
@@ -376,10 +508,13 @@ function App() {
                   )}
                 </div>
                 
+                {/* Price table section */}
+                {renderPriceTable(key)}
+                
                 {key === "Arcserve" && (
                   <div className="arcserve-dropdowns">
                     <div>
-                      <label className="dropdown-label">Platform:</label>
+                      <label className="dropdown-label" style={{ color: theme.tableHeader }}>Platform:</label>
                       <select
                         value={arcservePlatform}
                         onChange={e => setArcservePlatform(e.target.value)}
@@ -395,7 +530,7 @@ function App() {
                       </select>
                     </div>
                     <div>
-                      <label className="dropdown-label">Cloud:</label>
+                      <label className="dropdown-label" style={{ color: theme.tableHeader }}>Cloud:</label>
                       <select
                         value={arcserveCloud}
                         onChange={e => setArcserveCloud(e.target.value)}
@@ -448,7 +583,8 @@ function App() {
           justifyContent: 'center',
           alignItems: 'center',
           gap: '1.5rem',
-          margin: '2rem 0 1.5rem 0'
+          margin: '2rem 0 1.5rem 0',
+          flexWrap: 'wrap'
         }}>
           <input
             type="text"
@@ -539,7 +675,18 @@ function App() {
               gap: '1.5rem'
             }}>
               <div>
-                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                <label style={{ fontWeight: 600, color: theme.tableHeader }}>
+                  <input
+                    type="checkbox"
+                    checked={isAnnual}
+                    onChange={() => setIsAnnual(v => !v)}
+                    style={{ marginRight: '0.5rem' }}
+                  />
+                  Annual Billing (12 months upfront)
+                </label>
+              </div>
+              <div>
+                <label style={{ fontWeight: 600, color: theme.tableHeader }}>
                   Markup Percentage (min 15%):{" "}
                   <input
                     type="number"
@@ -561,7 +708,7 @@ function App() {
                 </label>
               </div>
               <div>
-                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                <label style={{ fontWeight: 600, color: theme.tableHeader }}>
                   Discount Percentage:{" "}
                   <input
                     type="number"
@@ -584,7 +731,7 @@ function App() {
                 </label>
               </div>
               <div>
-                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                <label style={{ fontWeight: 600, color: theme.tableHeader }}>
                   Tax Percentage:{" "}
                   <input
                     type="number"
@@ -606,7 +753,7 @@ function App() {
                 </label>
               </div>
               <div>
-                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                <label style={{ fontWeight: 600, color: theme.tableHeader }}>
                   <input
                     type="checkbox"
                     checked={stripeWaived}
@@ -632,7 +779,7 @@ function App() {
               color: theme.accent,
               letterSpacing: '0.01em'
             }}>
-              Pricing Summary
+              Pricing Summary {isAnnual ? "(Annual)" : "(Monthly)"}
             </h2>
             <div ref={summaryRef} id="quote-summary">
               {summary.length === 0 ? (
@@ -648,10 +795,10 @@ function App() {
                 }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Type</th>
-                      <th style={{ textAlign: 'center', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Qty</th>
-                      <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Base/Unit</th>
-                      <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Subtotal</th>
+                      <th style={{ textAlign: 'left', padding: '0.6rem 0', color: theme.tableHeader, fontWeight: 700 }}>Type</th>
+                      <th style={{ textAlign: 'center', padding: '0.6rem 0', color: theme.tableHeader, fontWeight: 700 }}>Qty</th>
+                      <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.tableHeader, fontWeight: 700 }}>{isAnnual ? "Annual/Unit (with tax)" : "Base/Unit (with tax)"}</th>
+                      <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.tableHeader, fontWeight: 700 }}>Subtotal</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -666,27 +813,23 @@ function App() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textSecondary }}>Total Before Markup</td>
+                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.tableHeader }}>Total Before Markup</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textPrimary }}>${totalBeforeMarkup.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Markup ({markupPercent}%)</td>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.tableHeader }}>Markup ({markupPercent}%)</td>
                       <td style={{ textAlign: 'right', color: theme.textPrimary }}>${markupAmount.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Discount ({discountPercent}%)</td>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.tableHeader }}>Discount ({discountPercent}%)</td>
                       <td style={{ textAlign: 'right', color: theme.textPrimary }}>-${discountAmount.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Tax ({taxPercent}%)</td>
-                      <td style={{ textAlign: 'right', color: theme.textPrimary }}>${taxAmount.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Stripe Fee {stripeWaived ? "(Waived)" : "(2.9%)"}</td>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.tableHeader }}>Stripe Fee {stripeWaived ? "(Waived)" : "(2.9%)"}</td>
                       <td style={{ textAlign: 'right', color: theme.textPrimary }}>${stripeFee.toFixed(2)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textSecondary }}>Grand Total</td>
+                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.tableHeader }}>Grand Total</td>
                       <td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textPrimary }}>${totalAfterTax.toFixed(2)}</td>
                     </tr>
                   </tfoot>
@@ -784,7 +927,7 @@ function App() {
           display: block;
           margin-bottom: 4px;
           font-size: 0.9rem;
-          color: ${theme.textSecondary};
+          color: ${theme.tableHeader};
         }
         .dropdown-select {
           width: 100%;
