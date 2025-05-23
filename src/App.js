@@ -3,12 +3,12 @@ import { FiSun, FiMoon } from "react-icons/fi";
 import etDark from "./assets/et_dark.svg";
 import etWhite from "./assets/et_white.svg";
 
-// Turquoise (feroza) hex code
 const TURQUOISE = "#40E0D0";
 const DARK_BG = "#232323";
 const LIGHT_BG = "#f5f6fa";
 const WHITE = "#fff";
 const TEXT_DARK = "#232323";
+const arcservePrice = 5.38;
 
 const pricingData = {
   Desktop: { base: [ { min: 1, max: 25, cost: 5.88 }, { min: 26, max: 50, cost: 5.66 }, { min: 51, max: 100, cost: 5.35 }, { min: 101, max: 150, cost: 4.99 }, { min: 151, max: Infinity, cost: 4.66 } ] },
@@ -18,7 +18,7 @@ const pricingData = {
 };
 
 const getBaseCost = (type, qty) => {
-  const tier = pricingData[type].base.find(
+  const tier = pricingData[type]?.base.find(
     range => qty >= range.min && qty <= range.max
   );
   return tier ? tier.cost : 0;
@@ -36,13 +36,17 @@ function App() {
     Desktop: 0,
     VMs: 0,
     SBS: 0,
-    "Physical Server": 0
+    "Physical Server": 0,
+    Arcserve: 0
   });
   const [markupPercent, setMarkupPercent] = useState(15);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [stripeWaived, setStripeWaived] = useState(false);
   const [taxPercent, setTaxPercent] = useState(13);
   const [darkMode, setDarkMode] = useState(false);
+
+  const [arcservePlatform, setArcservePlatform] = useState("Office365");
+  const [arcserveCloud, setArcserveCloud] = useState("AWS");
 
   useEffect(() => {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -86,24 +90,6 @@ function App() {
     setTaxPercent(Math.max(0, numValue));
   };
 
-  let totalBeforeMarkup = 0;
-  const summary = licenseOptions.map(({ key }) => {
-    const qty = quantities[key];
-    if (qty === 0) return null;
-    const base = getBaseCost(key, qty);
-    const subtotal = base * qty;
-    totalBeforeMarkup += subtotal;
-    return { key, quantity: qty, base, subtotal, taxed: base * (1 + taxPercent / 100) };
-  }).filter(Boolean);
-
-  const markupAmount = (totalBeforeMarkup * markupPercent) / 100;
-  const totalAfterMarkup = totalBeforeMarkup + markupAmount;
-  const discountAmount = (totalAfterMarkup * discountPercent) / 100;
-  const totalAfterDiscount = totalAfterMarkup - discountAmount;
-  const taxAmount = (totalAfterDiscount * taxPercent) / 100;
-  const stripeFee = stripeWaived ? 0 : (totalAfterDiscount + taxAmount) * 0.029;
-  const totalAfterTax = totalAfterDiscount + taxAmount + stripeFee;
-
   const theme = darkMode
     ? {
         bg: DARK_BG,
@@ -132,12 +118,48 @@ function App() {
 
   const logoSrc = darkMode ? etDark : etWhite;
 
+  let totalBeforeMarkup = 0;
+  const summary = [
+    ...licenseOptions.map(({ key }) => {
+      const qty = quantities[key];
+      if (qty === 0) return null;
+      const base = getBaseCost(key, qty);
+      const subtotal = base * qty;
+      totalBeforeMarkup += subtotal;
+      return { key, quantity: qty, base, subtotal, taxed: base * (1 + taxPercent / 100) };
+    }).filter(Boolean),
+    quantities.Arcserve > 0
+      ? {
+          key: `Arcserve SaaS Backup (${arcservePlatform}, ${arcserveCloud})`,
+          quantity: quantities.Arcserve,
+          base: arcservePrice,
+          subtotal: arcservePrice * quantities.Arcserve,
+          taxed: arcservePrice * (1 + taxPercent / 100)
+        }
+      : null
+  ].filter(Boolean);
+
+  if (quantities.Arcserve > 0) {
+    totalBeforeMarkup += arcservePrice * quantities.Arcserve;
+  }
+
+  const markupAmount = (totalBeforeMarkup * markupPercent) / 100;
+  const totalAfterMarkup = totalBeforeMarkup + markupAmount;
+  const discountAmount = (totalAfterMarkup * discountPercent) / 100;
+  const totalAfterDiscount = totalAfterMarkup - discountAmount;
+  const taxAmount = (totalAfterDiscount * taxPercent) / 100;
+  const stripeFee = stripeWaived ? 0 : (totalAfterDiscount + taxAmount) * 0.029;
+  const totalAfterTax = totalAfterDiscount + taxAmount + stripeFee;
+
+  // Arcserve tax calculation for display in card
+  const arcserveTaxed = arcservePrice * (1 + taxPercent / 100);
+
   return (
     <div style={{
       minHeight: '100vh',
       background: theme.bg,
       transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
-      padding: '2vw 0',
+      padding: 0,
       position: 'relative'
     }}>
       {/* Logo at top left */}
@@ -165,11 +187,12 @@ function App() {
         />
       </a>
 
-      <div style={{
+      <div className="main-container" style={{
         maxWidth: '1200px',
         margin: '0 auto',
-        padding: '2rem',
-        position: 'relative'
+        padding: '2.5rem 24px 0 24px',
+        position: 'relative',
+        boxSizing: 'border-box'
       }}>
         <button
           onClick={toggleTheme}
@@ -201,44 +224,22 @@ function App() {
           fontWeight: 800,
           letterSpacing: '0.01em',
           margin: '0 0 2.5rem 0',
-          color: theme.accent // Turquoise
+          color: theme.accent
         }}>
           ExcelyTech Pricing Calculator
         </h1>
 
         {/* Pricing Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '2rem',
-          marginBottom: '2.5rem'
-        }}>
+        <div className="card-row">
           {licenseOptions.map(({ key, label, feature }) => {
             const qty = quantities[key];
             const base = getBaseCost(key, qty);
             const taxed = base * (1 + taxPercent / 100);
 
             return (
-              <div key={key} style={{
-                borderRadius: '1rem',
-                boxShadow: theme.shadow,
-                border: theme.border,
-                background: theme.cardBg,
-                padding: '2rem 1.5rem',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                <h3 style={{
-                  fontSize: '1.15rem',
-                  fontWeight: 700,
-                  marginBottom: '0.2rem',
-                  color: theme.accent // Turquoise
-                }}>{label}</h3>
-                <div style={{
-                  fontSize: '0.98rem',
-                  color: theme.textSecondary,
-                  marginBottom: '1.2rem'
-                }}>{feature}</div>
+              <div key={key} className="card">
+                <h3 className="card-title" style={{ color: theme.accent }}>{label}</h3>
+                <div className="card-feature" style={{ color: theme.textSecondary }}>{feature}</div>
                 <div style={{ marginBottom: '1.2rem', minHeight: '2.5rem' }}>
                   {qty > 0 ? (
                     <>
@@ -255,84 +256,115 @@ function App() {
                     </span>
                   )}
                 </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.6rem',
-                  maxWidth: '220px',
-                  margin: '0 auto'
-                }}>
+                <div className="card-actions">
                   <button
                     onClick={() => incrementQuantity(key, -1)}
-                    style={{
-                      background: theme.buttonSecondary,
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      padding: '0.5rem 1rem',
-                      color: '#fff',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: '1.2rem',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      transition: 'background 0.2s'
-                    }}
+                    className="card-btn minus"
+                    style={{ background: theme.buttonSecondary }}
                   >-</button>
                   <input
                     type="number"
                     value={qty}
                     min="0"
                     onChange={(e) => updateQuantity(key, e.target.value)}
+                    className="card-input"
                     style={{
-                      width: '72px',
-                      textAlign: 'center',
                       background: theme.inputBg,
                       border: theme.border,
-                      borderRadius: '0.5rem',
-                      color: theme.textPrimary,
-                      fontWeight: 600,
-                      padding: '0.6rem 0.5rem',
-                      fontSize: '1.1rem',
-                      outline: 'none',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                      color: theme.textPrimary
                     }}
                   />
                   <button
                     onClick={() => incrementQuantity(key, 1)}
-                    style={{
-                      background: theme.buttonPrimary,
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      padding: '0.5rem 1rem',
-                      color: '#fff',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: '1.2rem',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      transition: 'background 0.2s'
-                    }}
+                    className="card-btn plus"
+                    style={{ background: theme.buttonPrimary }}
                   >+</button>
                 </div>
               </div>
             );
           })}
+          {/* Arcserve SaaS Backup Card */}
+          <div className="card">
+            <h3 className="card-title" style={{ color: theme.accent, marginBottom: '1.2rem' }}>
+              Arcserve SaaS Backup
+            </h3>
+            <div className="arcserve-dropdowns">
+              <div>
+                <label className="dropdown-label">Platform:</label>
+                <select
+                  value={arcservePlatform}
+                  onChange={e => setArcservePlatform(e.target.value)}
+                  className="dropdown-select"
+                  style={{
+                    background: theme.inputBg,
+                    color: theme.textPrimary,
+                    border: theme.border
+                  }}
+                >
+                  <option value="Office365">Office365</option>
+                  <option value="G-Suite">G-Suite</option>
+                </select>
+              </div>
+              <div>
+                <label className="dropdown-label">Cloud:</label>
+                <select
+                  value={arcserveCloud}
+                  onChange={e => setArcserveCloud(e.target.value)}
+                  className="dropdown-select"
+                  style={{
+                    background: theme.inputBg,
+                    color: theme.textPrimary,
+                    border: theme.border
+                  }}
+                >
+                  <option value="AWS">AWS</option>
+                  <option value="Azure">Azure</option>
+                </select>
+              </div>
+            </div>
+            <div className="arcserve-summary" style={{
+              background: darkMode ? "#181818" : "#f7fafc",
+              color: theme.textPrimary,
+              border: theme.border
+            }}>
+              <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
+                <span style={{ opacity: 0.8 }}>Base:</span> <strong>${arcservePrice.toFixed(2)} CAD</strong>
+              </div>
+              <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
+                <span style={{ opacity: 0.8 }}>With Tax:</span> <strong>${arcserveTaxed.toFixed(2)} CAD</strong>
+              </div>
+            </div>
+            <div className="card-actions">
+              <button
+                onClick={() => incrementQuantity("Arcserve", -1)}
+                className="card-btn minus"
+                style={{ background: theme.buttonSecondary }}
+              >-</button>
+              <input
+                type="number"
+                value={quantities.Arcserve}
+                min="0"
+                onChange={e => updateQuantity("Arcserve", e.target.value)}
+                className="card-input"
+                style={{
+                  background: theme.inputBg,
+                  border: theme.border,
+                  color: theme.textPrimary
+                }}
+              />
+              <button
+                onClick={() => incrementQuantity("Arcserve", 1)}
+                className="card-btn plus"
+                style={{ background: theme.buttonPrimary }}
+              >+</button>
+            </div>
+          </div>
         </div>
 
         {/* Pricing Config & Summary Side by Side */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '2.5rem',
-            flexWrap: 'wrap',
-            marginBottom: '2rem'
-          }}
-        >
+        <div className="bottom-row">
           {/* Pricing Configuration */}
-          <div style={{
-            flex: '1 1 320px',
-            minWidth: '300px',
-            maxWidth: '480px',
-            padding: '2rem 1.5rem',
-            borderRadius: '1rem',
+          <div className="bottom-card" style={{
             background: theme.cardBg,
             border: theme.border,
             boxShadow: theme.shadow
@@ -341,7 +373,7 @@ function App() {
               fontSize: '1.25rem',
               fontWeight: 700,
               marginBottom: '1.2rem',
-              color: theme.accent, // Turquoise
+              color: theme.accent,
               letterSpacing: '0.01em'
             }}>
               Pricing Configuration
@@ -433,12 +465,7 @@ function App() {
           </div>
 
           {/* Pricing Summary */}
-          <div style={{
-            flex: '2 1 420px',
-            minWidth: '320px',
-            maxWidth: '650px',
-            padding: '2rem 1.5rem',
-            borderRadius: '1rem',
+          <div className="bottom-card" style={{
             background: theme.cardBg,
             border: theme.border,
             boxShadow: theme.shadow
@@ -447,7 +474,7 @@ function App() {
               fontSize: '1.25rem',
               fontWeight: 700,
               marginBottom: '1.2rem',
-              color: theme.accent, // Turquoise
+              color: theme.accent,
               letterSpacing: '0.01em'
             }}>
               Pricing Summary
@@ -514,9 +541,169 @@ function App() {
       </div>
       <style>
         {`
+        .main-container {
+          box-sizing: border-box;
+        }
+        .card-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: stretch;
+          gap: 2rem;
+          margin-bottom: 2.5rem;
+          flex-wrap: nowrap;
+        }
+        .card {
+          background: ${theme.cardBg};
+          border: ${theme.border};
+          box-shadow: ${theme.shadow};
+          border-radius: 1rem;
+          padding: 2rem 1.5rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          align-items: stretch;
+          width: 19.2%;
+          min-width: 200px;
+          max-width: 100%;
+          min-height: 410px;
+          box-sizing: border-box;
+        }
+        .card-title {
+          font-size: 1.15rem;
+          font-weight: 700;
+          margin-bottom: 0.2rem;
+        }
+        .card-feature {
+          font-size: 0.98rem;
+          margin-bottom: 1.2rem;
+        }
+        .card-actions {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.6rem;
+          width: 100%;
+          max-width: 100%;
+          margin: 0 auto;
+          margin-top: auto;
+          box-sizing: border-box;
+        }
+        .card-btn, .card-input {
+          min-width: 0;
+          box-sizing: border-box;
+        }
+        .card-btn {
+          flex: 0 0 44px;
+          width: 44px;
+          height: 44px;
+          border-radius: 0.5rem;
+          font-size: 1.3rem;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .card-input {
+          flex: 1 1 48px;
+          min-width: 40px;
+          max-width: 60px;
+          text-align: center;
+          border-radius: 0.5rem;
+          font-weight: 600;
+          padding: 0.6rem 0.5rem;
+          font-size: 1.1rem;
+          outline: none;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .arcserve-dropdowns {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 24px;
+          flex-wrap: wrap;
+        }
+        .dropdown-label {
+          font-weight: 600;
+          margin-right: 8px;
+          display: block;
+          margin-bottom: 4px;
+        }
+        .dropdown-select {
+          width: 100%;
+          padding: 0.5rem 0.7rem;
+          border-radius: 6px;
+          font-size: 1rem;
+        }
+        .arcserve-summary {
+          background: ${darkMode ? "#181818" : "#f7fafc"};
+          border-radius: 10px;
+          padding: 1rem;
+          margin-bottom: 12px;
+          border: ${theme.border};
+          font-weight: 500;
+        }
+        .bottom-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 2rem;
+          margin-bottom: 2rem;
+        }
+        .bottom-card {
+          flex: 1 1 0;
+          min-width: 0;
+          max-width: 100%;
+          padding: 2rem 1.5rem;
+          border-radius: 1rem;
+          box-sizing: border-box;
+        }
+        @media (max-width: 1200px) {
+          .card-row {
+            gap: 1.2rem;
+          }
+          .card {
+            width: 23%;
+            min-width: 180px;
+          }
+          .bottom-row {
+            gap: 1.2rem;
+          }
+        }
         @media (max-width: 900px) {
-          div[style*="display: flex"][style*="gap: 2.5rem"] {
-            flex-direction: column !important;
+          .main-container {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+          }
+          .card-row {
+            flex-wrap: wrap;
+            gap: 1rem;
+          }
+          .card {
+            width: 48%;
+            min-width: 180px;
+            margin-bottom: 1rem;
+          }
+          .bottom-row {
+            flex-direction: column;
+            gap: 1rem;
+          }
+        }
+        @media (max-width: 700px) {
+          .card-row {
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+          }
+          .card {
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
+          }
+          .arcserve-dropdowns {
+            flex-direction: column;
+            gap: 10px;
+          }
+          .bottom-row {
+            flex-direction: column;
+            gap: 1rem;
           }
         }
         `}
