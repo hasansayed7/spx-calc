@@ -1,5 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FiSun, FiMoon } from "react-icons/fi";
+import emailjs from "@emailjs/browser";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import etDark from "./assets/et_dark.svg";
 import etWhite from "./assets/et_white.svg";
 
@@ -47,6 +50,19 @@ function App() {
 
   const [arcservePlatform, setArcservePlatform] = useState("Office365");
   const [arcserveCloud, setArcserveCloud] = useState("AWS");
+
+  // EmailJS config
+  const EMAILJS_SERVICE_ID = "service_vlucwqs";
+  const EMAILJS_TEMPLATE_ID = "template_aohvrgo";
+  const EMAILJS_PUBLIC_KEY = "t8u7O0F9f-vRqIYxy";
+
+  // Email form fields
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [sending, setSending] = useState(false);
+
+  // For capturing the summary HTML
+  const summaryRef = useRef(null);
 
   useEffect(() => {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -153,6 +169,118 @@ function App() {
 
   // Arcserve tax calculation for display in card
   const arcserveTaxed = arcservePrice * (1 + taxPercent / 100);
+
+  // EmailJS send function
+  const sendQuotationEmail = () => {
+    if (!customerEmail || !customerName) {
+      alert("Please enter customer name and email.");
+      return;
+    }
+    setSending(true);
+    const summaryHtml = summaryRef.current ? summaryRef.current.innerHTML : "";
+    const templateParams = {
+      customer_name: customerName,
+      to_email: customerEmail,
+      message: summaryHtml
+    };
+    emailjs
+      .send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        templateParams,
+        EMAILJS_PUBLIC_KEY
+      )
+      .then(() => {
+        setSending(false);
+        alert("Quotation email sent successfully!");
+      })
+      .catch((error) => {
+        setSending(false);
+        alert("Failed to send email: " + error.text);
+      });
+  };
+
+  // PDF export function (excludes markup)
+  const exportPDF = () => {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "a4"
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 40;
+
+    // Title
+    doc.setFontSize(22);
+    doc.setTextColor("#232323");
+    doc.text("ExcelyTech Quotation", pageWidth / 2, y, { align: "center" });
+    y += 32;
+
+    // Pricing Configuration (excluding markup)
+    doc.setFontSize(13);
+    doc.setTextColor("#444");
+    doc.text(`Tax Percentage: ${taxPercent}%`, 40, y);
+    y += 18;
+    doc.text(`Discount Percentage: ${discountPercent}%`, 40, y);
+    y += 18;
+    doc.text(`Stripe Fee: ${stripeWaived ? "Waived" : "2.9%"}`, 40, y);
+    y += 28;
+
+    // Product Selections Table
+    doc.setFontSize(15);
+    doc.setTextColor("#232323");
+    doc.text("Product Selection", 40, y);
+    y += 14;
+
+    // Table Headers
+    doc.setFontSize(12);
+    doc.setTextColor("#666");
+    doc.text("Type", 40, y);
+    doc.text("Qty", 210, y, { align: "right" });
+    doc.text("Base/Unit", 300, y, { align: "right" });
+    doc.text("Subtotal", pageWidth - 40, y, { align: "right" });
+    y += 12;
+
+    doc.setDrawColor(180);
+    doc.line(40, y, pageWidth - 40, y);
+    y += 8;
+
+    doc.setFontSize(12);
+    doc.setTextColor("#232323");
+    summary.forEach(item => {
+      doc.text(item.key, 40, y);
+      doc.text(String(item.quantity), 210, y, { align: "right" });
+      doc.text(`$${item.base.toFixed(2)}`, 300, y, { align: "right" });
+      doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 40, y, { align: "right" });
+      y += 16;
+    });
+
+    y += 12;
+    doc.setDrawColor(200);
+    doc.line(40, y, pageWidth - 40, y);
+    y += 20;
+
+    // Pricing Summary (excluding markup)
+    doc.setFontSize(13);
+    doc.setTextColor("#444");
+    doc.text(`Total Before Discount: $${totalAfterMarkup.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
+    doc.text(`Discount (${discountPercent}%): -$${discountAmount.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
+    doc.text(`Tax (${taxPercent}%): $${taxAmount.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
+    doc.text(`Stripe Fee: $${stripeFee.toFixed(2)}`, pageWidth - 40, y, { align: "right" }); y += 18;
+
+    doc.setFontSize(15);
+    doc.setTextColor("#232323");
+    y += 10;
+    doc.text(`Grand Total: $${totalAfterTax.toFixed(2)}`, pageWidth - 40, y, { align: "right" });
+
+    y += 36;
+    doc.setFontSize(12);
+    doc.setTextColor("#888");
+    doc.text("If you have any questions or require adjustments, please contact info@excelytech.com", 40, y);
+
+    doc.save("ExcelyTech_Quotation.pdf");
+  };
 
   return (
     <div style={{
@@ -361,6 +489,80 @@ function App() {
           </div>
         </div>
 
+        {/* Email & PDF Buttons */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '1.5rem',
+          margin: '2rem 0 1.5rem 0'
+        }}>
+          <input
+            type="text"
+            value={customerName}
+            onChange={e => setCustomerName(e.target.value)}
+            placeholder="Customer Name"
+            style={{
+              padding: '0.7rem 1rem',
+              borderRadius: 8,
+              border: theme.border,
+              background: theme.inputBg,
+              color: theme.textPrimary,
+              fontSize: '1rem',
+              width: 220
+            }}
+          />
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={e => setCustomerEmail(e.target.value)}
+            placeholder="Customer Email"
+            style={{
+              padding: '0.7rem 1rem',
+              borderRadius: 8,
+              border: theme.border,
+              background: theme.inputBg,
+              color: theme.textPrimary,
+              fontSize: '1rem',
+              width: 260
+            }}
+          />
+          <button
+            onClick={sendQuotationEmail}
+            disabled={sending}
+            style={{
+              background: theme.buttonPrimary,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "0.8rem 2.2rem",
+              fontWeight: 700,
+              fontSize: "1.08rem",
+              cursor: sending ? "not-allowed" : "pointer",
+              opacity: sending ? 0.7 : 1,
+              boxShadow: theme.shadow
+            }}
+          >
+            {sending ? "Sending..." : "Send Quotation Email"}
+          </button>
+          <button
+            onClick={exportPDF}
+            style={{
+              background: theme.buttonPrimary,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "0.8rem 2.2rem",
+              fontWeight: 700,
+              fontSize: "1.08rem",
+              cursor: "pointer",
+              boxShadow: theme.shadow
+            }}
+          >
+            Download Quotation PDF
+          </button>
+        </div>
+
         {/* Pricing Config & Summary Side by Side */}
         <div className="bottom-row">
           {/* Pricing Configuration */}
@@ -479,63 +681,65 @@ function App() {
             }}>
               Pricing Summary
             </h2>
-            {summary.length === 0 ? (
-              <div style={{ color: theme.textSecondary }}>
-                No licenses selected yet.
-              </div>
-            ) : (
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginBottom: '1.5rem',
-                fontSize: '1.07rem'
-              }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Type</th>
-                    <th style={{ textAlign: 'center', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Base/Unit</th>
-                    <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.map(item => (
-                    <tr key={item.key}>
-                      <td style={{ padding: '0.5rem 0', color: theme.textPrimary }}>{item.key}</td>
-                      <td style={{ textAlign: 'center', padding: '0.5rem 0', color: theme.textPrimary }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right', padding: '0.5rem 0', color: theme.textPrimary }}>${item.base.toFixed(2)}</td>
-                      <td style={{ textAlign: 'right', padding: '0.5rem 0', color: theme.textPrimary }}>${item.subtotal.toFixed(2)}</td>
+            <div ref={summaryRef} id="quote-summary">
+              {summary.length === 0 ? (
+                <div style={{ color: theme.textSecondary }}>
+                  No licenses selected yet.
+                </div>
+              ) : (
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  marginBottom: '1.5rem',
+                  fontSize: '1.07rem'
+                }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Type</th>
+                      <th style={{ textAlign: 'center', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Qty</th>
+                      <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Base/Unit</th>
+                      <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Subtotal</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textSecondary }}>Total Before Markup</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textPrimary }}>${totalBeforeMarkup.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Markup ({markupPercent}%)</td>
-                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>${markupAmount.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Discount ({discountPercent}%)</td>
-                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>-${discountAmount.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Tax ({taxPercent}%)</td>
-                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>${taxAmount.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Stripe Fee {stripeWaived ? "(Waived)" : "(2.9%)"}</td>
-                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>${stripeFee.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textSecondary }}>Grand Total</td>
-                    <td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textPrimary }}>${totalAfterTax.toFixed(2)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            )}
+                  </thead>
+                  <tbody>
+                    {summary.map(item => (
+                      <tr key={item.key}>
+                        <td style={{ padding: '0.5rem 0', color: theme.textPrimary }}>{item.key}</td>
+                        <td style={{ textAlign: 'center', padding: '0.5rem 0', color: theme.textPrimary }}>{item.quantity}</td>
+                        <td style={{ textAlign: 'right', padding: '0.5rem 0', color: theme.textPrimary }}>${item.base.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', padding: '0.5rem 0', color: theme.textPrimary }}>${item.subtotal.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textSecondary }}>Total Before Markup</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textPrimary }}>${totalBeforeMarkup.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Markup ({markupPercent}%)</td>
+                      <td style={{ textAlign: 'right', color: theme.textPrimary }}>${markupAmount.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Discount ({discountPercent}%)</td>
+                      <td style={{ textAlign: 'right', color: theme.textPrimary }}>-${discountAmount.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Tax ({taxPercent}%)</td>
+                      <td style={{ textAlign: 'right', color: theme.textPrimary }}>${taxAmount.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Stripe Fee {stripeWaived ? "(Waived)" : "(2.9%)"}</td>
+                      <td style={{ textAlign: 'right', color: theme.textPrimary }}>${stripeFee.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textSecondary }}>Grand Total</td>
+                      <td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textPrimary }}>${totalAfterTax.toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       </div>
