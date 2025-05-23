@@ -31,7 +31,8 @@ const licenseOptions = [
   { key: "Desktop", label: "🖥 Desktop", feature: "Great for individual workstations" },
   { key: "VMs", label: "☁️ VMs", feature: "Scalable for virtual environments" },
   { key: "SBS", label: "🧑‍💼 SBS", feature: "Ideal for small business servers" },
-  { key: "Physical Server", label: "🖨 Physical Server", feature: "Support for enterprise needs" }
+  { key: "Physical Server", label: "🖨 Physical Server", feature: "Support for enterprise needs" },
+  { key: "Arcserve", label: "🔐 Arcserve SaaS", feature: "Cloud backup solution" }
 ];
 
 function App() {
@@ -139,25 +140,18 @@ function App() {
     ...licenseOptions.map(({ key }) => {
       const qty = quantities[key];
       if (qty === 0) return null;
-      const base = getBaseCost(key, qty);
+      const base = key === "Arcserve" ? arcservePrice : getBaseCost(key, qty);
       const subtotal = base * qty;
       totalBeforeMarkup += subtotal;
-      return { key, quantity: qty, base, subtotal, taxed: base * (1 + taxPercent / 100) };
-    }).filter(Boolean),
-    quantities.Arcserve > 0
-      ? {
-          key: `Arcserve SaaS Backup (${arcservePlatform}, ${arcserveCloud})`,
-          quantity: quantities.Arcserve,
-          base: arcservePrice,
-          subtotal: arcservePrice * quantities.Arcserve,
-          taxed: arcservePrice * (1 + taxPercent / 100)
-        }
-      : null
-  ].filter(Boolean);
-
-  if (quantities.Arcserve > 0) {
-    totalBeforeMarkup += arcservePrice * quantities.Arcserve;
-  }
+      return { 
+        key: key === "Arcserve" ? `Arcserve SaaS Backup (${arcservePlatform}, ${arcserveCloud})` : key, 
+        quantity: qty, 
+        base, 
+        subtotal, 
+        taxed: base * (1 + taxPercent / 100) 
+      };
+    }).filter(Boolean)
+  ];
 
   const markupAmount = (totalBeforeMarkup * markupPercent) / 100;
   const totalAfterMarkup = totalBeforeMarkup + markupAmount;
@@ -166,9 +160,6 @@ function App() {
   const taxAmount = (totalAfterDiscount * taxPercent) / 100;
   const stripeFee = stripeWaived ? 0 : (totalAfterDiscount + taxAmount) * 0.029;
   const totalAfterTax = totalAfterDiscount + taxAmount + stripeFee;
-
-  // Arcserve tax calculation for display in card
-  const arcserveTaxed = arcservePrice * (1 + taxPercent / 100);
 
   // EmailJS send function
   const sendQuotationEmail = () => {
@@ -361,20 +352,20 @@ function App() {
         <div className="card-row">
           {licenseOptions.map(({ key, label, feature }) => {
             const qty = quantities[key];
-            const base = getBaseCost(key, qty);
+            const base = key === "Arcserve" ? arcservePrice : getBaseCost(key, qty);
             const taxed = base * (1 + taxPercent / 100);
 
             return (
               <div key={key} className="card">
                 <h3 className="card-title" style={{ color: theme.accent }}>{label}</h3>
                 <div className="card-feature" style={{ color: theme.textSecondary }}>{feature}</div>
-                <div style={{ marginBottom: '1.2rem', minHeight: '2.5rem' }}>
+                <div style={{ marginBottom: '1.2rem', minHeight: '2.5rem', display: 'flex', alignItems: 'center' }}>
                   {qty > 0 ? (
                     <>
                       <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
                         <span style={{ opacity: 0.8 }}>Base:</span> <strong>${base.toFixed(2)} CAD</strong>
                       </div>
-                      <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
+                      <div style={{ fontSize: '1rem', color: theme.textPrimary, marginLeft: 16 }}>
                         <span style={{ opacity: 0.8 }}>With Tax:</span> <strong>${taxed.toFixed(2)} CAD</strong>
                       </div>
                     </>
@@ -384,6 +375,44 @@ function App() {
                     </span>
                   )}
                 </div>
+                
+                {key === "Arcserve" && (
+                  <div className="arcserve-dropdowns">
+                    <div>
+                      <label className="dropdown-label">Platform:</label>
+                      <select
+                        value={arcservePlatform}
+                        onChange={e => setArcservePlatform(e.target.value)}
+                        className="dropdown-select"
+                        style={{
+                          background: theme.inputBg,
+                          color: theme.textPrimary,
+                          border: theme.border
+                        }}
+                      >
+                        <option value="Office365">Office365</option>
+                        <option value="G-Suite">G-Suite</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="dropdown-label">Cloud:</label>
+                      <select
+                        value={arcserveCloud}
+                        onChange={e => setArcserveCloud(e.target.value)}
+                        className="dropdown-select"
+                        style={{
+                          background: theme.inputBg,
+                          color: theme.textPrimary,
+                          border: theme.border
+                        }}
+                      >
+                        <option value="AWS">AWS</option>
+                        <option value="Azure">Azure</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="card-actions">
                   <button
                     onClick={() => incrementQuantity(key, -1)}
@@ -411,84 +440,8 @@ function App() {
               </div>
             );
           })}
-          {/* Arcserve SaaS Backup Card */}
-          <div className="card">
-            <h3 className="card-title" style={{ color: theme.accent, marginBottom: '1.2rem' }}>
-              Arcserve SaaS Backup
-            </h3>
-            <div className="arcserve-dropdowns">
-              <div>
-                <label className="dropdown-label">Platform:</label>
-                <select
-                  value={arcservePlatform}
-                  onChange={e => setArcservePlatform(e.target.value)}
-                  className="dropdown-select"
-                  style={{
-                    background: theme.inputBg,
-                    color: theme.textPrimary,
-                    border: theme.border
-                  }}
-                >
-                  <option value="Office365">Office365</option>
-                  <option value="G-Suite">G-Suite</option>
-                </select>
-              </div>
-              <div>
-                <label className="dropdown-label">Cloud:</label>
-                <select
-                  value={arcserveCloud}
-                  onChange={e => setArcserveCloud(e.target.value)}
-                  className="dropdown-select"
-                  style={{
-                    background: theme.inputBg,
-                    color: theme.textPrimary,
-                    border: theme.border
-                  }}
-                >
-                  <option value="AWS">AWS</option>
-                  <option value="Azure">Azure</option>
-                </select>
-              </div>
-            </div>
-            <div className="arcserve-summary" style={{
-              background: darkMode ? "#181818" : "#f7fafc",
-              color: theme.textPrimary,
-              border: theme.border
-            }}>
-              <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
-                <span style={{ opacity: 0.8 }}>Base:</span> <strong>${arcservePrice.toFixed(2)} CAD</strong>
-              </div>
-              <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
-                <span style={{ opacity: 0.8 }}>With Tax:</span> <strong>${arcserveTaxed.toFixed(2)} CAD</strong>
-              </div>
-            </div>
-            <div className="card-actions">
-              <button
-                onClick={() => incrementQuantity("Arcserve", -1)}
-                className="card-btn minus"
-                style={{ background: theme.buttonSecondary }}
-              >-</button>
-              <input
-                type="number"
-                value={quantities.Arcserve}
-                min="0"
-                onChange={e => updateQuantity("Arcserve", e.target.value)}
-                className="card-input"
-                style={{
-                  background: theme.inputBg,
-                  border: theme.border,
-                  color: theme.textPrimary
-                }}
-              />
-              <button
-                onClick={() => incrementQuantity("Arcserve", 1)}
-                className="card-btn plus"
-                style={{ background: theme.buttonPrimary }}
-              >+</button>
-            </div>
-          </div>
         </div>
-
+        
         {/* Email & PDF Buttons */}
         <div style={{
           display: 'flex',
@@ -830,20 +783,17 @@ function App() {
           margin-right: 8px;
           display: block;
           margin-bottom: 4px;
+          font-size: 0.9rem;
+          color: ${theme.textSecondary};
         }
         .dropdown-select {
           width: 100%;
           padding: 0.5rem 0.7rem;
           border-radius: 6px;
-          font-size: 1rem;
-        }
-        .arcserve-summary {
-          background: ${darkMode ? "#181818" : "#f7fafc"};
-          border-radius: 10px;
-          padding: 1rem;
-          margin-bottom: 12px;
+          font-size: 0.95rem;
+          background: ${theme.inputBg};
+          color: ${theme.textPrimary};
           border: ${theme.border};
-          font-weight: 500;
         }
         .bottom-row {
           display: flex;
