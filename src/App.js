@@ -1,11 +1,27 @@
 import { useState, useEffect } from "react";
+import { FiSun, FiMoon } from "react-icons/fi";
+import etDark from "./assets/et_dark.svg";
+import etWhite from "./assets/et_white.svg";
+
+// Turquoise (feroza) hex code
+const TURQUOISE = "#40E0D0";
+const DARK_BG = "#232323";
+const LIGHT_BG = "#f5f6fa";
+const WHITE = "#fff";
+const TEXT_DARK = "#232323";
 
 const pricingData = {
-  "1-25": { Desktop: 6.64, VMs: 33.9, SBS: 27.17, "Physical Server": 48.84 },
-  "26-50": { Desktop: 6.4, VMs: 33.9, SBS: 25.75, "Physical Server": 45.36 },
-  "51-100": { Desktop: 6.05, VMs: 33.9, SBS: 23.87, "Physical Server": 40.79 },
-  "101-150": { Desktop: 5.64, VMs: 33.9, SBS: 21.75, "Physical Server": 35.23 },
-  "150+": { Desktop: 5.27, VMs: 31.37, SBS: 20.03, "Physical Server": 31.36 }
+  Desktop: { base: [ { min: 1, max: 25, cost: 5.88 }, { min: 26, max: 50, cost: 5.66 }, { min: 51, max: 100, cost: 5.35 }, { min: 101, max: 150, cost: 4.99 }, { min: 151, max: Infinity, cost: 4.66 } ] },
+  VMs: { base: [ { min: 1, max: 25, cost: 30.00 }, { min: 26, max: 50, cost: 30.00 }, { min: 51, max: 100, cost: 30.00 }, { min: 101, max: 150, cost: 30.00 }, { min: 151, max: Infinity, cost: 27.76 } ] },
+  SBS: { base: [ { min: 1, max: 25, cost: 24.05 }, { min: 26, max: 50, cost: 22.79 }, { min: 51, max: 100, cost: 21.13 }, { min: 101, max: 150, cost: 19.26 }, { min: 151, max: Infinity, cost: 17.72 } ] },
+  "Physical Server": { base: [ { min: 1, max: 25, cost: 43.22 }, { min: 26, max: 50, cost: 40.14 }, { min: 51, max: 100, cost: 36.10 }, { min: 101, max: 150, cost: 31.51 }, { min: 151, max: Infinity, cost: 27.76 } ] }
+};
+
+const getBaseCost = (type, qty) => {
+  const tier = pricingData[type].base.find(
+    range => qty >= range.min && qty <= range.max
+  );
+  return tier ? tier.cost : 0;
 };
 
 const licenseOptions = [
@@ -15,528 +31,498 @@ const licenseOptions = [
   { key: "Physical Server", label: "🖨 Physical Server", feature: "Support for enterprise needs" }
 ];
 
-const getQuantityTier = (quantity) => {
-  if (quantity <= 25) return "1-25";
-  if (quantity <= 50) return "26-50";
-  if (quantity <= 100) return "51-100";
-  if (quantity <= 150) return "101-150";
-  return "150+";
-};
-
 function App() {
-  const [markup, setMarkup] = useState(15);
   const [quantities, setQuantities] = useState({
     Desktop: 0,
     VMs: 0,
     SBS: 0,
     "Physical Server": 0
   });
-  const [serviceCharge, setServiceCharge] = useState("");
+  const [markupPercent, setMarkupPercent] = useState(15);
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [stripeWaived, setStripeWaived] = useState(false);
   const [taxPercent, setTaxPercent] = useState(13);
-  const [stripeFeePercent, setStripeFeePercent] = useState(2.9);
-  const [waiveStripeFee, setWaiveStripeFee] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Check user's preferred color scheme
   useEffect(() => {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setDarkMode(true);
     }
   }, []);
 
-  const exchangeRate = 61.87;
-  const safeMarkup = Math.max(markup, 15);
-  const safeTax = Math.max(taxPercent, 0);
+  const toggleTheme = () => setDarkMode(!darkMode);
 
-  let totalResale = 0;
-  let totalINR = 0;
+  const updateQuantity = (key, value) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue)) {
+      setQuantities(prev => ({
+        ...prev,
+        [key]: Math.max(0, numValue)
+      }));
+    }
+  };
 
-  const summary = licenseOptions.map(({ key }) => {
-    const quantity = Math.max(0, quantities[key]);
-    if (quantity === 0) return null;
-
-    const tier = getQuantityTier(quantity);
-    const baseWithTax = pricingData[tier][key];
-    const basePreTax = baseWithTax / (1 + 0.13);
-    const resalePreTax = basePreTax * (1 + safeMarkup / 100);
-    const resaleWithTax = resalePreTax * (1 + safeTax / 100);
-
-    const subtotal = resaleWithTax * quantity;
-    totalResale += subtotal;
-    totalINR += subtotal * exchangeRate;
-
-    return { key, quantity, resaleWithTax };
-  }).filter(Boolean);
-
-  const updateQuantity = (key, delta) => {
+  const incrementQuantity = (key, delta) => {
     setQuantities(prev => ({
       ...prev,
       [key]: Math.max(0, prev[key] + delta)
     }));
   };
 
-  const stripeFee = waiveStripeFee ? 0 : (stripeFeePercent / 100) * totalResale;
-  const finalTotalCAD = totalResale + stripeFee;
-  const finalTotalINR = finalTotalCAD * exchangeRate;
-
-  // Theme styles
-  const themeStyles = {
-    light: {
-      bg: "linear-gradient(rgba(255,255,255,0.97), rgba(255,255,255,0.97)), url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80')",
-      cardBg: "rgba(255,255,255,0.95)",
-      textPrimary: "#2b2d42",
-      textSecondary: "#6c757d",
-      inputBg: "white",
-      border: "1px solid rgba(0,0,0,0.08)",
-      summaryBg: "rgba(248,249,250,0.8)",
-      productCard: "rgba(250,250,250,0.7)",
-      highlight: "rgba(58,134,255,0.1)"
-    },
-    dark: {
-      bg: "linear-gradient(rgba(17,24,39,0.95), rgba(17,24,39,0.95)), url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80')",
-      cardBg: "rgba(31,41,55,0.95)",
-      textPrimary: "#f3f4f6",
-      textSecondary: "#9ca3af",
-      inputBg: "rgba(55,65,81,0.8)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      summaryBg: "rgba(17,24,39,0.8)",
-      productCard: "rgba(55,65,81,0.5)",
-      highlight: "rgba(59,130,246,0.2)"
-    }
+  const handleMarkupChange = (value) => {
+    const numValue = parseFloat(value) || 15;
+    setMarkupPercent(Math.max(15, numValue));
   };
 
-  const currentTheme = darkMode ? themeStyles.dark : themeStyles.light;
+  const handleDiscountChange = (value) => {
+    let numValue = parseFloat(value) || 0;
+    if (numValue > 100) numValue = 100;
+    if (numValue < 0) numValue = 0;
+    setDiscountPercent(numValue);
+  };
+
+  const handleTaxChange = (value) => {
+    const numValue = parseFloat(value) || 0;
+    setTaxPercent(Math.max(0, numValue));
+  };
+
+  let totalBeforeMarkup = 0;
+  const summary = licenseOptions.map(({ key }) => {
+    const qty = quantities[key];
+    if (qty === 0) return null;
+    const base = getBaseCost(key, qty);
+    const subtotal = base * qty;
+    totalBeforeMarkup += subtotal;
+    return { key, quantity: qty, base, subtotal, taxed: base * (1 + taxPercent / 100) };
+  }).filter(Boolean);
+
+  const markupAmount = (totalBeforeMarkup * markupPercent) / 100;
+  const totalAfterMarkup = totalBeforeMarkup + markupAmount;
+  const discountAmount = (totalAfterMarkup * discountPercent) / 100;
+  const totalAfterDiscount = totalAfterMarkup - discountAmount;
+  const taxAmount = (totalAfterDiscount * taxPercent) / 100;
+  const stripeFee = stripeWaived ? 0 : (totalAfterDiscount + taxAmount) * 0.029;
+  const totalAfterTax = totalAfterDiscount + taxAmount + stripeFee;
+
+  const theme = darkMode
+    ? {
+        bg: DARK_BG,
+        cardBg: "#232323",
+        textPrimary: "#fff",
+        textSecondary: "#b2b7bb",
+        accent: TURQUOISE,
+        buttonPrimary: TURQUOISE,
+        buttonSecondary: "#ff1744",
+        inputBg: "#232323",
+        border: "1.5px solid #343a3f",
+        shadow: "0 4px 24px rgba(0,0,0,0.18)"
+      }
+    : {
+        bg: LIGHT_BG,
+        cardBg: WHITE,
+        textPrimary: TEXT_DARK,
+        textSecondary: "#5c6bc0",
+        accent: TURQUOISE,
+        buttonPrimary: TURQUOISE,
+        buttonSecondary: "#ff1744",
+        inputBg: "#f7fafc",
+        border: "1.5px solid #e3e8f7",
+        shadow: "0 4px 24px rgba(31, 38, 135, 0.06)"
+      };
+
+  const logoSrc = darkMode ? etDark : etWhite;
 
   return (
     <div style={{
-      minHeight: "100vh",
-      fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
-      backgroundImage: currentTheme.bg,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundAttachment: "fixed",
-      padding: "20px 0",
-      color: currentTheme.textPrimary,
-      transition: "all 0.3s ease"
+      minHeight: '100vh',
+      background: theme.bg,
+      transition: 'all 0.3s cubic-bezier(.4,0,.2,1)',
+      padding: '2vw 0',
+      position: 'relative'
     }}>
-      <style>
-        {`
-          @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        `}
-      </style>
+      {/* Logo at top left */}
+      <a
+        href="https://excelytech.com"
+        style={{
+          position: "absolute",
+          top: 24,
+          left: 24,
+          zIndex: 100,
+          display: "flex",
+          alignItems: "center",
+          textDecoration: "none"
+        }}
+        aria-label="ExcelyTech Home"
+      >
+        <img
+          src={logoSrc}
+          alt="ExcelyTech Logo"
+          style={{
+            height: 44,
+            width: "auto",
+            display: "block"
+          }}
+        />
+      </a>
 
       <div style={{
-        maxWidth: 900,
-        margin: "0 auto",
-        padding: 30,
-        borderRadius: 16,
-        boxShadow: darkMode ? "0 10px 40px rgba(0,0,0,0.3)" : "0 10px 40px rgba(0,0,0,0.12)",
-        backgroundColor: currentTheme.cardBg,
-        backdropFilter: "blur(8px)",
-        border: darkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.3)",
-        transition: "all 0.3s ease"
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '2rem',
+        position: 'relative'
       }}>
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 25,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
-            <div style={{
-              width: 50,
-              height: 50,
-              borderRadius: 12,
-              backgroundColor: "#3a86ff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontSize: 24,
-              fontWeight: "700",
-              fontFamily: "'Inter', sans-serif"
-            }}>
-              ET
-            </div>
-            <div>
-              <h1 style={{ 
-                fontSize: 28, 
-                margin: 0, 
-                color: currentTheme.textPrimary,
-                fontWeight: "600",
-                fontFamily: "'Poppins', sans-serif",
-                letterSpacing: "-0.5px"
-              }}>
-                ExcelyTech Pricing Calculator
-              </h1>
-              <p style={{ 
-                margin: 0, 
-                color: currentTheme.textSecondary, 
-                fontSize: 14,
-                fontWeight: "400",
-                fontFamily: "'Inter', sans-serif"
-              }}>
-                Business Continuity & Cloud Solutions
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            style={{
-              background: darkMode ? "#374151" : "#e5e7eb",
-              border: "none",
-              borderRadius: 8,
-              padding: "8px 12px",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: "pointer",
-              color: darkMode ? "#f3f4f6" : "#111827",
-              fontFamily: "'Inter', sans-serif",
-              fontWeight: "500",
-              transition: "all 0.3s ease"
-            }}
-          >
-            {darkMode ? (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 3V4M12 20V21M4 12H3M6.31412 6.31412L5.5 5.5M17.6859 6.31412L18.5 5.5M6.31412 17.69L5.5 18.5001M17.6859 17.69L18.5 18.5001M21 12H20M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Light Mode
-              </>
-            ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.32031 11.6835C3.32031 16.7601 7.34975 20.7895 12.4264 20.7895C16.1075 20.7895 19.3483 18.8423 20.6768 15.6319C19.6402 16.1186 18.5059 16.3949 17.3215 16.3949C12.2448 16.3949 8.21537 12.3655 8.21537 7.28883C8.21537 5.97441 8.51205 4.72391 9.048 3.61804C5.81638 4.99359 3.32031 8.25258 3.32031 11.6835Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Dark Mode
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={toggleTheme}
+          style={{
+            position: 'absolute',
+            top: '1.5rem',
+            right: '2rem',
+            background: theme.buttonPrimary,
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: '48px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: theme.shadow,
+            zIndex: 10,
+            transition: 'background 0.3s'
+          }}
+        >
+          {darkMode ? <FiSun size={22} /> : <FiMoon size={22} />}
+        </button>
 
-        {/* Products */}
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "1fr 1fr", 
-          gap: 20, 
-          marginBottom: 30 
+        <h1 style={{
+          textAlign: 'center',
+          fontSize: '2.4rem',
+          fontWeight: 800,
+          letterSpacing: '0.01em',
+          margin: '0 0 2.5rem 0',
+          color: theme.accent // Turquoise
+        }}>
+          ExcelyTech Pricing Calculator
+        </h1>
+
+        {/* Pricing Cards */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '2rem',
+          marginBottom: '2.5rem'
         }}>
           {licenseOptions.map(({ key, label, feature }) => {
-            const quantity = quantities[key];
-            const tier = getQuantityTier(Math.max(1, quantity));
-            const baseWithTax = pricingData[tier][key];
-            const basePreTax = baseWithTax / 1.13;
-            const resalePreTax = basePreTax * (1 + safeMarkup / 100);
-            const resaleWithTax = resalePreTax * (1 + safeTax / 100);
+            const qty = quantities[key];
+            const base = getBaseCost(key, qty);
+            const taxed = base * (1 + taxPercent / 100);
 
             return (
               <div key={key} style={{
-                padding: 20,
-                border: currentTheme.border,
-                borderRadius: 12,
-                backgroundColor: currentTheme.productCard,
-                transition: "all 0.3s ease",
-                ":hover": {
-                  boxShadow: darkMode ? "0 5px 15px rgba(0,0,0,0.2)" : "0 5px 15px rgba(0,0,0,0.05)",
-                  transform: "translateY(-2px)"
-                }
+                borderRadius: '1rem',
+                boxShadow: theme.shadow,
+                border: theme.border,
+                background: theme.cardBg,
+                padding: '2rem 1.5rem',
+                position: 'relative',
+                overflow: 'hidden'
               }}>
-                <div style={{ 
-                  fontWeight: "600", 
-                  marginBottom: 6,
-                  color: currentTheme.textPrimary,
-                  fontSize: 16,
-                  fontFamily: "'Poppins', sans-serif"
-                }}>{label}</div>
-                <div style={{ 
-                  fontSize: 13, 
-                  color: currentTheme.textSecondary, 
-                  marginBottom: 10,
-                  minHeight: 40,
-                  fontFamily: "'Inter', sans-serif",
-                  lineHeight: "1.5"
+                <h3 style={{
+                  fontSize: '1.15rem',
+                  fontWeight: 700,
+                  marginBottom: '0.2rem',
+                  color: theme.accent // Turquoise
+                }}>{label}</h3>
+                <div style={{
+                  fontSize: '0.98rem',
+                  color: theme.textSecondary,
+                  marginBottom: '1.2rem'
                 }}>{feature}</div>
-                <div style={{ 
-                  fontSize: 14, 
-                  marginBottom: 12,
-                  backgroundColor: currentTheme.highlight,
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  display: "inline-block",
-                  color: "#3a86ff",
-                  fontWeight: "500",
-                  fontFamily: "'Inter', sans-serif"
-                }}>
-                  Final Price: ${resaleWithTax.toFixed(2)} CAD
+                <div style={{ marginBottom: '1.2rem', minHeight: '2.5rem' }}>
+                  {qty > 0 ? (
+                    <>
+                      <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
+                        <span style={{ opacity: 0.8 }}>Base:</span> <strong>${base.toFixed(2)} CAD</strong>
+                      </div>
+                      <div style={{ fontSize: '1rem', color: theme.textPrimary }}>
+                        <span style={{ opacity: 0.8 }}>With Tax:</span> <strong>${taxed.toFixed(2)} CAD</strong>
+                      </div>
+                    </>
+                  ) : (
+                    <span style={{ color: theme.textSecondary, fontSize: '0.98rem' }}>
+                      Select quantity to see price
+                    </span>
+                  )}
                 </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <button 
-                    onClick={() => updateQuantity(key, -1)} 
-                    style={btnStyle("red", darkMode)}
-                  >
-                    −
-                  </button>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  maxWidth: '220px',
+                  margin: '0 auto'
+                }}>
+                  <button
+                    onClick={() => incrementQuantity(key, -1)}
+                    style={{
+                      background: theme.buttonSecondary,
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '1.2rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      transition: 'background 0.2s'
+                    }}
+                  >-</button>
                   <input
                     type="number"
-                    readOnly
-                    value={quantity}
-                    style={{ 
-                      width: 50, 
-                      textAlign: "center", 
-                      fontSize: 14,
-                      padding: "6px",
-                      border: darkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e9ecef",
-                      borderRadius: 6,
-                      backgroundColor: currentTheme.inputBg,
-                      fontFamily: "'Inter', sans-serif",
-                      fontWeight: "500",
-                      color: currentTheme.textPrimary,
-                      transition: "all 0.3s ease"
+                    value={qty}
+                    min="0"
+                    onChange={(e) => updateQuantity(key, e.target.value)}
+                    style={{
+                      width: '72px',
+                      textAlign: 'center',
+                      background: theme.inputBg,
+                      border: theme.border,
+                      borderRadius: '0.5rem',
+                      color: theme.textPrimary,
+                      fontWeight: 600,
+                      padding: '0.6rem 0.5rem',
+                      fontSize: '1.1rem',
+                      outline: 'none',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
                     }}
                   />
-                  <button 
-                    onClick={() => updateQuantity(key, 1)} 
-                    style={btnStyle("green", darkMode)}
-                  >
-                    +
-                  </button>
+                  <button
+                    onClick={() => incrementQuantity(key, 1)}
+                    style={{
+                      background: theme.buttonPrimary,
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '1.2rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      transition: 'background 0.2s'
+                    }}
+                  >+</button>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Inputs */}
-        <div style={{ 
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 20,
-          marginBottom: 30
-        }}>
-          <div>
-            <label style={labelStyle(darkMode)}>Markup % (min 15%)</label>
-            <input 
-              type="number" 
-              value={markup} 
-              min={15} 
-              onChange={e => setMarkup(+e.target.value)} 
-              style={inputStyle(darkMode)} 
-            />
-          </div>
-          <div>
-            <label style={labelStyle(darkMode)}>Service Charge (CAD)</label>
-            <input 
-              type="text" 
-              value={serviceCharge} 
-              onChange={e => setServiceCharge(e.target.value)} 
-              style={inputStyle(darkMode)} 
-            />
-          </div>
-          <div>
-            <label style={labelStyle(darkMode)}>Tax %</label>
-            <input 
-              type="number" 
-              value={taxPercent} 
-              onChange={e => setTaxPercent(+e.target.value)} 
-              style={inputStyle(darkMode)} 
-            />
-          </div>
-          <div>
-            <label style={labelStyle(darkMode)}>Stripe Fee %</label>
-            <input 
-              type="number" 
-              value={stripeFeePercent} 
-              onChange={e => setStripeFeePercent(+e.target.value)} 
-              style={inputStyle(darkMode)} 
-            />
-            <div style={{ marginTop: 10 }}>
-              <label style={{ 
-                display: "flex", 
-                alignItems: "center", 
-                gap: 8,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: "14px",
-                color: currentTheme.textSecondary,
-                transition: "all 0.3s ease"
-              }}>
-                <input 
-                  type="checkbox" 
-                  checked={waiveStripeFee} 
-                  onChange={e => setWaiveStripeFee(e.target.checked)} 
-                  style={{ 
-                    width: 16, 
-                    height: 16,
-                    accentColor: "#3a86ff"
-                  }}
-                /> 
-                Waive Stripe Fee
-              </label>
+        {/* Pricing Config & Summary Side by Side */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '2.5rem',
+            flexWrap: 'wrap',
+            marginBottom: '2rem'
+          }}
+        >
+          {/* Pricing Configuration */}
+          <div style={{
+            flex: '1 1 320px',
+            minWidth: '300px',
+            maxWidth: '480px',
+            padding: '2rem 1.5rem',
+            borderRadius: '1rem',
+            background: theme.cardBg,
+            border: theme.border,
+            boxShadow: theme.shadow
+          }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              marginBottom: '1.2rem',
+              color: theme.accent, // Turquoise
+              letterSpacing: '0.01em'
+            }}>
+              Pricing Configuration
+            </h2>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem'
+            }}>
+              <div>
+                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                  Markup Percentage (min 15%):{" "}
+                  <input
+                    type="number"
+                    value={markupPercent}
+                    min={15}
+                    onChange={e => handleMarkupChange(e.target.value)}
+                    style={{
+                      marginLeft: '0.5rem',
+                      width: '70px',
+                      background: theme.inputBg,
+                      border: theme.border,
+                      borderRadius: '0.5rem',
+                      color: theme.textPrimary,
+                      padding: '0.35rem 0.7rem',
+                      fontWeight: 600,
+                      fontSize: '1rem'
+                    }}
+                  />%
+                </label>
+              </div>
+              <div>
+                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                  Discount Percentage:{" "}
+                  <input
+                    type="number"
+                    value={discountPercent}
+                    min={0}
+                    max={100}
+                    onChange={e => handleDiscountChange(e.target.value)}
+                    style={{
+                      marginLeft: '0.5rem',
+                      width: '70px',
+                      background: theme.inputBg,
+                      border: theme.border,
+                      borderRadius: '0.5rem',
+                      color: theme.textPrimary,
+                      padding: '0.35rem 0.7rem',
+                      fontWeight: 600,
+                      fontSize: '1rem'
+                    }}
+                  />%
+                </label>
+              </div>
+              <div>
+                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                  Tax Percentage:{" "}
+                  <input
+                    type="number"
+                    value={taxPercent}
+                    min={0}
+                    onChange={e => handleTaxChange(e.target.value)}
+                    style={{
+                      marginLeft: '0.5rem',
+                      width: '70px',
+                      background: theme.inputBg,
+                      border: theme.border,
+                      borderRadius: '0.5rem',
+                      color: theme.textPrimary,
+                      padding: '0.35rem 0.7rem',
+                      fontWeight: 600,
+                      fontSize: '1rem'
+                    }}
+                  />%
+                </label>
+              </div>
+              <div>
+                <label style={{ fontWeight: 600, color: theme.textPrimary }}>
+                  <input
+                    type="checkbox"
+                    checked={stripeWaived}
+                    onChange={() => setStripeWaived(v => !v)}
+                    style={{ marginRight: '0.5rem' }}
+                  />
+                  Waive Stripe Fee (2.9%)
+                </label>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Summary */}
-        <div style={{
-          backgroundColor: currentTheme.summaryBg,
-          padding: 25,
-          borderRadius: 12,
-          border: currentTheme.border,
-          boxShadow: "inset 0 1px 3px rgba(0,0,0,0.02)",
-          transition: "all 0.3s ease"
-        }}>
-          <h3 style={{ 
-            fontSize: 18, 
-            marginBottom: 15,
-            color: currentTheme.textPrimary,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            fontFamily: "'Poppins', sans-serif",
-            fontWeight: "600"
+          {/* Pricing Summary */}
+          <div style={{
+            flex: '2 1 420px',
+            minWidth: '320px',
+            maxWidth: '650px',
+            padding: '2rem 1.5rem',
+            borderRadius: '1rem',
+            background: theme.cardBg,
+            border: theme.border,
+            boxShadow: theme.shadow
           }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#3a86ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Order Summary
-          </h3>
-          {summary.length === 0 ? (
-            <p style={{ 
-              color: currentTheme.textSecondary, 
-              textAlign: "center", 
-              padding: "10px 0",
-              fontFamily: "'Inter', sans-serif"
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              marginBottom: '1.2rem',
+              color: theme.accent, // Turquoise
+              letterSpacing: '0.01em'
             }}>
-              Select products to see pricing breakdown
-            </p>
-          ) : (
-            <>
-              {summary.map(({ key, quantity, resaleWithTax }) => (
-                <div key={key} style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
-                  borderBottom: darkMode ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.05)",
-                  fontFamily: "'Inter', sans-serif",
-                  transition: "all 0.3s ease"
-                }}>
-                  <span style={{ color: currentTheme.textSecondary }}>{key}</span>
-                  <span style={{ fontWeight: "500", color: currentTheme.textPrimary }}>
-                    {quantity} × ${resaleWithTax.toFixed(2)} CAD
-                  </span>
-                </div>
-              ))}
-              <div style={{ 
-                margin: "15px 0",
-                height: 1,
-                backgroundColor: darkMode ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-                transition: "all 0.3s ease"
-              }} />
-              <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "8px 0",
-                fontFamily: "'Inter', sans-serif",
-                transition: "all 0.3s ease"
-              }}>
-                <span style={{ color: currentTheme.textSecondary }}>Service Charge</span>
-                <span style={{ color: currentTheme.textPrimary }}>
-                  {serviceCharge ? `$${serviceCharge} CAD` : "N/A"}
-                </span>
+              Pricing Summary
+            </h2>
+            {summary.length === 0 ? (
+              <div style={{ color: theme.textSecondary }}>
+                No licenses selected yet.
               </div>
-              <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "8px 0",
-                fontFamily: "'Inter', sans-serif",
-                transition: "all 0.3s ease"
+            ) : (
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginBottom: '1.5rem',
+                fontSize: '1.07rem'
               }}>
-                <span style={{ color: currentTheme.textSecondary }}>Stripe Fee</span>
-                <span style={{ color: currentTheme.textPrimary }}>
-                  ${stripeFee.toFixed(2)} CAD
-                </span>
-              </div>
-              <div style={{ 
-                marginTop: 20,
-                padding: "15px",
-                backgroundColor: currentTheme.highlight,
-                borderRadius: 8,
-                textAlign: "center",
-                transition: "all 0.3s ease"
-              }}>
-                <div style={{ 
-                  fontWeight: "600", 
-                  fontSize: 18,
-                  color: currentTheme.textPrimary,
-                  fontFamily: "'Poppins', sans-serif"
-                }}>
-                  Total: ${finalTotalCAD.toFixed(2)} CAD
-                </div>
-                <div style={{ 
-                  fontSize: 16,
-                  color: currentTheme.textSecondary,
-                  marginTop: 5,
-                  fontFamily: "'Inter', sans-serif"
-                }}>
-                  ≈ ₹{finalTotalINR.toFixed(0)} INR
-                </div>
-              </div>
-            </>
-          )}
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Type</th>
+                    <th style={{ textAlign: 'center', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Qty</th>
+                    <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Base/Unit</th>
+                    <th style={{ textAlign: 'right', padding: '0.6rem 0', color: theme.textSecondary, fontWeight: 700 }}>Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.map(item => (
+                    <tr key={item.key}>
+                      <td style={{ padding: '0.5rem 0', color: theme.textPrimary }}>{item.key}</td>
+                      <td style={{ textAlign: 'center', padding: '0.5rem 0', color: theme.textPrimary }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem 0', color: theme.textPrimary }}>${item.base.toFixed(2)}</td>
+                      <td style={{ textAlign: 'right', padding: '0.5rem 0', color: theme.textPrimary }}>${item.subtotal.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textSecondary }}>Total Before Markup</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, paddingTop: '0.8rem', color: theme.textPrimary }}>${totalBeforeMarkup.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Markup ({markupPercent}%)</td>
+                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>${markupAmount.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Discount ({discountPercent}%)</td>
+                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>-${discountAmount.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Tax ({taxPercent}%)</td>
+                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>${taxAmount.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', color: theme.textSecondary }}>Stripe Fee {stripeWaived ? "(Waived)" : "(2.9%)"}</td>
+                    <td style={{ textAlign: 'right', color: theme.textPrimary }}>${stripeFee.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textSecondary }}>Grand Total</td>
+                    <td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1.15rem', color: theme.textPrimary }}>${totalAfterTax.toFixed(2)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
         </div>
       </div>
+      <style>
+        {`
+        @media (max-width: 900px) {
+          div[style*="display: flex"][style*="gap: 2.5rem"] {
+            flex-direction: column !important;
+          }
+        }
+        `}
+      </style>
     </div>
   );
 }
-
-const btnStyle = (color, darkMode) => ({
-  width: 36,
-  height: 36,
-  fontSize: 16,
-  border: "none",
-  borderRadius: 8,
-  backgroundColor: color === "red" ? (darkMode ? "#ef4444" : "#e63946") : (darkMode ? "#10b981" : "#2a9d8f"),
-  color: "#fff",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "all 0.3s ease",
-  fontFamily: "'Inter', sans-serif",
-  fontWeight: "500",
-  ":hover": {
-    transform: "scale(1.05)",
-    boxShadow: darkMode ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)"
-  }
-});
-
-const inputStyle = (darkMode) => ({
-  width: "100%",
-  padding: "12px",
-  marginTop: 8,
-  fontSize: 14,
-  borderRadius: 8,
-  border: darkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e9ecef",
-  backgroundColor: darkMode ? "rgba(55,65,81,0.8)" : "white",
-  transition: "all 0.3s ease",
-  fontFamily: "'Inter', sans-serif",
-  color: darkMode ? "#f3f4f6" : "#111827",
-  ":focus": {
-    outline: "none",
-    borderColor: "#3a86ff",
-    boxShadow: "0 0 0 3px rgba(58,134,255,0.2)"
-  }
-});
-
-const labelStyle = (darkMode) => ({
-  display: "block",
-  marginBottom: 8,
-  fontSize: 14,
-  fontWeight: "500",
-  color: darkMode ? "#d1d5db" : "#495057",
-  fontFamily: "'Inter', sans-serif",
-  transition: "all 0.3s ease"
-});
 
 export default App;
